@@ -23,10 +23,10 @@ export const Route = createFileRoute("/")({
 const KEY = "visita-state-v1";
 
 function VisitApp() {
-  const [s, setS] = useState<State>(initial);
+  const [s, setS] = useState<State>(initialState);
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    try { const raw = localStorage.getItem(KEY); if (raw) { const v = JSON.parse(raw); if (v.startInventory) setS(migrate(v)); } } catch {}
+    setS(loadState(localStorage.getItem(KEY)));
     setReady(true);
   }, []);
   useEffect(() => { if (ready) localStorage.setItem(KEY, JSON.stringify(s)); }, [s, ready]);
@@ -51,7 +51,7 @@ function VisitApp() {
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Paso {s.step + 1} de 8</p>
               <h1 className="font-display text-xl font-bold">{STEPS[s.step]}</h1>
             </div>
-            <button aria-label="Reiniciar demo" onClick={() => { if (confirm("¿Reiniciar la demostración?")) setS(initial()); }} className="rounded-full p-2 text-muted-foreground hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>
+            <button aria-label="Reiniciar demo" onClick={() => { if (confirm("¿Reiniciar la demostración?")) setS(initialState()); }} className="rounded-full p-2 text-muted-foreground hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>
           </div>
           <div className="mt-3 flex gap-1">
             {STEPS.map((_, i) => <div key={i} className={`h-1 flex-1 rounded-full ${i <= s.step ? "bg-primary" : "bg-muted"}`} />)}
@@ -167,7 +167,7 @@ function VisitApp() {
                 </div>
                 <p className="mb-2 mt-4 text-sm font-medium text-muted-foreground">Medio de pago</p>
                 <div className="grid grid-cols-3 gap-2">
-                  {["Efectivo", "Transferencia", "Nequi"].map((m) => (
+                  {METHODS.map((m) => (
                     <button key={m} onClick={() => up({ method: m })} className={`rounded-xl border py-2.5 text-sm font-medium ${s.method === m ? "border-primary bg-primary text-primary-foreground" : ""}`}>{m}</button>
                   ))}
                 </div>
@@ -234,7 +234,7 @@ function VisitApp() {
               }}><PackagePlus className="h-4 w-4" />Consignar</Primary>
             </div>
           )}
-          {s.step === 7 && <Secondary onClick={() => setS(initial())}><RotateCcw className="h-4 w-4" />Nueva demostración</Secondary>}
+          {s.step === 7 && <Secondary onClick={() => setS(initialState())}><RotateCcw className="h-4 w-4" />Nueva demostración</Secondary>}
         </footer>
       </div>
     </div>
