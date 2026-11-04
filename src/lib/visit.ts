@@ -24,6 +24,19 @@ export const DEMO_LINES: Lines = {
 
 export const DEMO_NEW: Inv = { usb: 10, usbc: 5, charger: 2, hands: 3 };
 
+// El conteo físico arranca con lo que hay registrado en inventario.
+export const defaultLines = (inv: Inv): Lines =>
+  Object.fromEntries(PRODUCTS.map((p) => [p.id, { sold: 0, returned: 0, lost: 0, physical: inv[p.id] }])) as Lines;
+
+// Al registrar vendidas/devueltas/mermas, el conteo físico se ajusta solo
+// (inventario − movimientos). Editarlo a mano lo deja como conteo real.
+export function setCount(prev: Line, k: keyof Line, v: number, available: number): Line {
+  const clamp = (n: number) => Math.max(0, Math.min(available, n));
+  const next: Line = { ...prev, [k]: clamp(v) };
+  if (k !== "physical") next.physical = Math.max(0, available - next.sold - next.returned - next.lost);
+  return next;
+}
+
 export const sum = (o: Record<string, number>) => Object.values(o).reduce((a, b) => a + b, 0);
 
 export function difference(available: number, l: Line) {
