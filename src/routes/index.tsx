@@ -233,7 +233,7 @@ function VisitApp() {
           }}>Confirmar liquidación · {money(st.total)}</Primary>}
           {s.step === 5 && <Primary onClick={() => {
             if (!confirm(`¿Registrar pago de ${money(s.payment)} en ${s.method}?`)) return;
-            const inv = Object.fromEntries(PRODUCTS.map((p) => [p.id, s.lines[p.id].physical]) as Inv;
+            const inv = Object.fromEntries(PRODUCTS.map((p) => [p.id, s.lines[p.id].physical])) as Inv;
             up({ balance: s.balance - s.payment, inventory: inv, step: 6 }); window.scrollTo(0, 0);
           }}>Registrar pago</Primary>}
           {s.step === 6 && (
@@ -241,7 +241,7 @@ function VisitApp() {
               <Secondary onClick={() => { up({ newCons: (Object.fromEntries(PRODUCTS.map((p) => [p.id, 0])) as Inv), consigned: 0 }); go(7); }}><Flag className="h-4 w-4" />Finalizar</Secondary>
               <Primary disabled={sum(s.newCons) === 0} onClick={() => {
                 if (!confirm(`¿Consignar ${sum(s.newCons)} unidades?`)) return;
-                const inv = Object.fromEntries(PRODUCTS.map((p) => [p.id, s.inventory[p.id] + s.newCons[p.id]]) as Inv;
+                const inv = Object.fromEntries(PRODUCTS.map((p) => [p.id, s.inventory[p.id] + s.newCons[p.id]])) as Inv;
                 up({ inventory: inv, consigned: sum(s.newCons), step: 7 }); window.scrollTo(0, 0);
               }}><PackagePlus className="h-4 w-4" />Consignar</Primary>
             </div>
