@@ -2,7 +2,8 @@ export type ProductId = "usb" | "usbc" | "charger" | "hands";
 export type Inv = Record<ProductId, number>;
 export type Lines = Record<ProductId, Line>;
 export type Product = { id: ProductId; name: string; price: number };
-export type Line = { sold: number; returned: number; lost: number; physical: number };
+export type Line = { sold: number; returned: number; lost: number; physical: number; manual?: boolean };
+export type CountKey = "sold" | "returned" | "lost" | "physical";
 
 export const PRODUCTS: Product[] = [
   { id: "usb", name: "Cable USB", price: 3000 },
