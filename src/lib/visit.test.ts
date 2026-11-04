@@ -21,7 +21,7 @@ describe("visita demo", () => {
     let l = setCount(defaultLines(INITIAL_INVENTORY).usb, "physical", 6, INITIAL_INVENTORY.usb);
     expect(l.physical).toBe(6);
     l = setCount(l, "sold", 2, INITIAL_INVENTORY.usb);
-    expect(l).toEqual({ sold: 2, returned: 0, lost: 0, physical: 6 });
+    expect(l).toEqual({ sold: 2, returned: 0, lost: 0, physical: 6, manual: true });
     expect(reconcile(INITIAL_INVENTORY, { ...defaultLines(INITIAL_INVENTORY), usb: l })
       .find((r) => r.product.id === "usb")!.diff).toBe(2);
   });
