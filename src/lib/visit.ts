@@ -99,7 +99,7 @@ export function loadState(raw: string | null): State {
     lines,
     balance,
     charged: clampNum(v.charged, 999999999),
-    payment: clampNum(v.payment, 999999999),
+    payment: v.payment == null ? base.payment : clampNum(v.payment, 999999999),
     method: METHODS.includes(String(v.method)) ? String(v.method) : METHODS[0],
     newCons: invOf(v.newCons, EMPTY_INV),
     consigned: clampNum(v.consigned, 999999999),

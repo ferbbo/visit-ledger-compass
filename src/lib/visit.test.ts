@@ -83,6 +83,7 @@ describe("estado guardado", () => {
     expect(s.lines.charger.physical).toBe(5);
     expect(s.lines.hands.physical).toBe(5);
     expect(s.step).toBe(2);
+    expect(s.payment).toBe(70000);
   });
   it("ajusta lo imposible: paso, medio de pago y conteos pasados de stock", () => {
     const s = loadState('{"step":99,"method":"Bitcoin","lines":{"usb":{"sold":1,"physical":99}}}');
