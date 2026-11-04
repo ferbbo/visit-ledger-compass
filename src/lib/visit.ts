@@ -39,7 +39,8 @@ export const DEMO_LINES: Lines = {
 export const DEMO_NEW: Inv = { usb: 10, usbc: 5, charger: 2, hands: 3 };
 
 export const STEPS = ["Cliente", "Inventario", "Liquidación", "Conciliación", "Resumen", "Pago", "Consignación", "Fin"];
-export const METHODS = ["Efectivo", "Transferencia", "Nequi"];
+export const METHODS = ["Efectivo", "Transferencia", "Nequi"] as const;
+const isMethod = (m: unknown) => (METHODS as readonly string[]).includes(String(m));
 
 const EMPTY_INV: Inv = { usb: 0, usbc: 0, charger: 0, hands: 0 };
 
@@ -100,7 +101,7 @@ export function loadState(raw: string | null): State {
     balance,
     charged: clampNum(v.charged, 999999999),
     payment: v.payment == null ? base.payment : clampNum(v.payment, 999999999),
-    method: METHODS.includes(String(v.method)) ? String(v.method) : METHODS[0],
+    method: isMethod(v.method) ? String(v.method) : METHODS[0],
     newCons: invOf(v.newCons, EMPTY_INV),
     consigned: clampNum(v.consigned, 999999999),
   };
