@@ -9,13 +9,13 @@ describe("visita demo", () => {
     const lines = { ...DEMO_LINES, usb: { ...DEMO_LINES.usb, physical: 1 } };
     expect(reconcile(INITIAL_INVENTORY, lines).find((r) => r.product.id === "usb")!.diff).toBe(1);
   });
-  it("liquida $82.000 sin cobrar mermas", () => {
+  it("liquida $98.000 (precios × vendidas) sin cobrar mermas", () => {
     const s = settlement(DEMO_LINES);
-    expect(s).toEqual({ sold: 19, returned: 2, lost: 1, remaining: 8, total: 82000 });
+    expect(s).toEqual({ sold: 19, returned: 2, lost: 1, remaining: 8, total: 98000 });
   });
-  it("saldo pendiente 32.000 e inventario final 28", () => {
+  it("saldo pendiente 48.000 e inventario final 28", () => {
     const s = settlement(DEMO_LINES);
-    expect(CLIENT.previousBalance + s.total - 70000).toBe(32000);
+    expect(CLIENT.previousBalance + s.total - 70000).toBe(48000);
     expect(s.remaining + sum(DEMO_NEW)).toBe(28);
   });
 });
