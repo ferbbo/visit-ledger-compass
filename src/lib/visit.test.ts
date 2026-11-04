@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { DEMO_LINES, DEMO_NEW, INITIAL_INVENTORY, defaultLines, reconcile, setCount, settlement, sum, CLIENT } from "./visit";
+import {
+  CLIENT, DEMO_LINES, DEMO_NEW, INITIAL_INVENTORY, METHODS, defaultLines, initialState, loadState, reconcile, setCount, settlement, sum,
+} from "./visit";
 
 describe("visita demo", () => {
   it("concilia sin diferencias", () => {
