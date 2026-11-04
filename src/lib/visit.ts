@@ -30,11 +30,12 @@ export const defaultLines = (inv: Inv): Lines =>
   Object.fromEntries(PRODUCTS.map((p) => [p.id, { sold: 0, returned: 0, lost: 0, physical: inv[p.id] }])) as Lines;
 
 // Al registrar vendidas/devueltas/mermas, el conteo físico se ajusta solo
-// (inventario − movimientos). Editarlo a mano lo deja como conteo real.
-export function setCount(prev: Line, k: keyof Line, v: number, available: number): Line {
+// (inventario − movimientos). Editarlo a mano lo deja como conteo real del cliente.
+export function setCount(prev: Line, k: CountKey, v: number, available: number): Line {
   const clamp = (n: number) => Math.max(0, Math.min(available, n));
   const next: Line = { ...prev, [k]: clamp(v) };
-  if (k !== "physical") next.physical = Math.max(0, available - next.sold - next.returned - next.lost);
+  if (k === "physical") next.manual = true;
+  else if (!prev.manual) next.physical = Math.max(0, available - next.sold - next.returned - next.lost);
   return next;
 }
 
