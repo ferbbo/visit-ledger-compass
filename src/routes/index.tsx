@@ -112,6 +112,7 @@ function VisitApp() {
           {s.step === 2 && (
             <>
               <button onClick={() => up({ lines: structuredClone(DEMO_LINES) })} className="w-full rounded-xl border border-dashed border-primary/50 py-2 text-sm font-medium text-primary">Cargar datos de prueba</button>
+              <p className="rounded-xl bg-muted/60 p-3 text-xs text-muted-foreground">El conteo <b className="text-foreground">Física</b> arranca con lo registrado en inventario y se baja solo con cada venta, devolución o merma. Escríbelo si el conteo real es otro.</p>
               {PRODUCTS.map((p) => {
                 const l = s.lines[p.id]; const avail = s.startInventory[p.id];
                 const diff = rec.find((r) => r.product.id === p.id)!.diff;
@@ -128,6 +129,10 @@ function VisitApp() {
                       <Stepper label="Mermas" value={l.lost} onChange={set("lost")} max={avail} />
                       <Stepper label="Física" value={l.physical} onChange={set("physical")} max={avail} />
                     </div>
+                    {l.manual && (
+                      <button onClick={() => up({ lines: { ...s.lines, [p.id]: { ...l, manual: false, physical: Math.max(0, avail - l.sold - l.returned - l.lost) } } })}
+                        className="mt-2 text-xs font-medium text-primary underline underline-offset-2">Deshacer conteo manual</button>
+                    )}
                   </Card>
                 );
               })}
