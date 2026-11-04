@@ -64,9 +64,10 @@ const num = (v: unknown, fallback = 0) => {
 const clampNum = (v: unknown, max: number) => Math.max(0, Math.min(Math.max(0, Math.round(max)), Math.round(num(v, 0))));
 
 const invOf = (v: unknown, fallback: Inv): Inv =>
-  Object.fromEntries(
-    PRODUCTS.map((p) => [p.id, clampNum((v as Record<string, unknown> | null | undefined)?.[p.id], 9999)]),
-  ) as Inv;
+  Object.fromEntries(PRODUCTS.map((p) => {
+    const raw = (v as Record<string, unknown> | null | undefined)?.[p.id];
+    return [p.id, clampNum(raw ?? fallback[p.id], 9999)];
+  })) as Inv;
 
 // Cualquier estado guardado (o corrupto) se reconstruye completo: nunca se confía
 // en que localStorage tenga todas las claves ni los productos.
@@ -98,7 +99,7 @@ export function loadState(raw: string | null): State {
     lines,
     balance,
     charged: clampNum(v.charged, 999999999),
-    payment: clampNum(v.payment, Math.max(0, balance)),
+    payment: clampNum(v.payment, 999999999),
     method: METHODS.includes(String(v.method)) ? String(v.method) : METHODS[0],
     newCons: invOf(v.newCons, EMPTY_INV),
     consigned: clampNum(v.consigned, 999999999),
