@@ -1,4 +1,7 @@
-export type Product = { id: string; name: string; price: number };
+export type ProductId = "usb" | "usbc" | "charger" | "hands";
+export type Inv = Record<ProductId, number>;
+export type Lines = Record<ProductId, Line>;
+export type Product = { id: ProductId; name: string; price: number };
 export type Line = { sold: number; returned: number; lost: number; physical: number };
 
 export const PRODUCTS: Product[] = [
@@ -10,16 +13,16 @@ export const PRODUCTS: Product[] = [
 
 export const CLIENT = { name: "Juan Martínez", phone: "+57 300 555 0142", previousBalance: 20000 };
 
-export const INITIAL_INVENTORY: Record<string, number> = { usb: 10, usbc: 10, charger: 5, hands: 5 };
+export const INITIAL_INVENTORY: Inv = { usb: 10, usbc: 10, charger: 5, hands: 5 };
 
-export const DEMO_LINES: Record<string, Line> = {
+export const DEMO_LINES: Lines = {
   usb: { sold: 8, returned: 0, lost: 0, physical: 2 },
   usbc: { sold: 6, returned: 1, lost: 0, physical: 3 },
   charger: { sold: 3, returned: 1, lost: 0, physical: 1 },
   hands: { sold: 2, returned: 0, lost: 1, physical: 2 },
 };
 
-export const DEMO_NEW: Record<string, number> = { usb: 10, usbc: 5, charger: 2, hands: 3 };
+export const DEMO_NEW: Inv = { usb: 10, usbc: 5, charger: 2, hands: 3 };
 
 export const sum = (o: Record<string, number>) => Object.values(o).reduce((a, b) => a + b, 0);
 
@@ -27,11 +30,11 @@ export function difference(available: number, l: Line) {
   return available - l.sold - l.returned - l.lost - l.physical;
 }
 
-export function reconcile(inv: Record<string, number>, lines: Record<string, Line>) {
-  return PRODUCTS.map((p) => ({ product: p, diff: difference(inv[p.id] ?? 0, lines[p.id]) }));
+export function reconcile(inv: Inv, lines: Lines) {
+  return PRODUCTS.map((p) => ({ product: p, diff: difference(inv[p.id], lines[p.id]) }));
 }
 
-export function settlement(lines: Record<string, Line>) {
+export function settlement(lines: Lines) {
   let sold = 0, returned = 0, lost = 0, remaining = 0, total = 0;
   for (const p of PRODUCTS) {
     const l = lines[p.id];

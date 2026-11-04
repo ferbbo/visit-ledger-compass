@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Minus, Plus, Check, AlertTriangle, Phone, ChevronLeft, PackagePlus, Flag, RotateCcw } from "lucide-react";
 import {
-  CLIENT, DEMO_LINES, DEMO_NEW, INITIAL_INVENTORY, PRODUCTS, money, reconcile, settlement, sum, type Line,
+  CLIENT, DEMO_LINES, DEMO_NEW, INITIAL_INVENTORY, PRODUCTS, money, reconcile, settlement, sum, type Line, type Lines, type Inv,
 } from "@/lib/visit";
 
 export const Route = createFileRoute("/")({
@@ -21,22 +21,22 @@ export const Route = createFileRoute("/")({
 
 type State = {
   step: number;
-  inventory: Record<string, number>;
-  lines: Record<string, Line>;
+  inventory: Inv;
+  lines: Lines;
   balance: number; // cuenta corriente
   charged: number;
   payment: number;
   method: string;
-  newCons: Record<string, number>;
+  newCons: Inv;
   consigned: number;
 };
 
 const STEPS = ["Cliente", "Inventario", "Liquidación", "Conciliación", "Resumen", "Pago", "Consignación", "Fin"];
 const KEY = "visita-state-v1";
-const zeroLines = () => Object.fromEntries(PRODUCTS.map((p) => [p.id, { sold: 0, returned: 0, lost: 0, physical: 0 }]));
+const zeroLines = () => Object.fromEntries(PRODUCTS.map((p) => [p.id, { sold: 0, returned: 0, lost: 0, physical: 0 }])) as Lines;
 const initial = (): State => ({
   step: 0, inventory: { ...INITIAL_INVENTORY }, lines: zeroLines(), balance: CLIENT.previousBalance,
-  charged: 0, payment: 70000, method: "Efectivo", newCons: Object.fromEntries(PRODUCTS.map((p) => [p.id, 0])), consigned: 0,
+  charged: 0, payment: 70000, method: "Efectivo", newCons: (Object.fromEntries(PRODUCTS.map((p) => [p.id, 0])) as Inv), consigned: 0,
 });
 
 function VisitApp() {
@@ -233,15 +233,15 @@ function VisitApp() {
           }}>Confirmar liquidación · {money(st.total)}</Primary>}
           {s.step === 5 && <Primary onClick={() => {
             if (!confirm(`¿Registrar pago de ${money(s.payment)} en ${s.method}?`)) return;
-            const inv = Object.fromEntries(PRODUCTS.map((p) => [p.id, s.lines[p.id].physical]));
+            const inv = Object.fromEntries(PRODUCTS.map((p) => [p.id, s.lines[p.id].physical]) as Inv;
             up({ balance: s.balance - s.payment, inventory: inv, step: 6 }); window.scrollTo(0, 0);
           }}>Registrar pago</Primary>}
           {s.step === 6 && (
             <div className="grid grid-cols-2 gap-2">
-              <Secondary onClick={() => { up({ newCons: Object.fromEntries(PRODUCTS.map((p) => [p.id, 0])), consigned: 0 }); go(7); }}><Flag className="h-4 w-4" />Finalizar</Secondary>
+              <Secondary onClick={() => { up({ newCons: (Object.fromEntries(PRODUCTS.map((p) => [p.id, 0])) as Inv), consigned: 0 }); go(7); }}><Flag className="h-4 w-4" />Finalizar</Secondary>
               <Primary disabled={sum(s.newCons) === 0} onClick={() => {
                 if (!confirm(`¿Consignar ${sum(s.newCons)} unidades?`)) return;
-                const inv = Object.fromEntries(PRODUCTS.map((p) => [p.id, s.inventory[p.id] + s.newCons[p.id]]));
+                const inv = Object.fromEntries(PRODUCTS.map((p) => [p.id, s.inventory[p.id] + s.newCons[p.id]]) as Inv;
                 up({ inventory: inv, consigned: sum(s.newCons), step: 7 }); window.scrollTo(0, 0);
               }}><PackagePlus className="h-4 w-4" />Consignar</Primary>
             </div>
