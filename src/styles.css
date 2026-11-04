@@ -46,6 +46,10 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
+  --font-display: "Bricolage Grotesque", sans-serif;
+  --font-sans: "Manrope", sans-serif;
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -95,6 +99,17 @@
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+  --background: oklch(0.985 0.008 95);
+  --foreground: oklch(0.2 0.02 160);
+  --card: oklch(1 0 0);
+  --primary: oklch(0.42 0.09 160);
+  --primary-foreground: oklch(0.98 0.01 95);
+  --muted: oklch(0.95 0.012 95);
+  --muted-foreground: oklch(0.5 0.02 160);
+  --accent: oklch(0.93 0.06 120);
+  --border: oklch(0.9 0.012 95);
+  --success: oklch(0.6 0.15 150);
+  --success-foreground: oklch(0.99 0 0);
 }
 
 .dark {
@@ -130,6 +145,8 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+  --success: oklch(0.7 0.15 150);
+  --success-foreground: oklch(0.15 0 0);
 }
 
 @layer base {
@@ -140,5 +157,6 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
   }
 }
