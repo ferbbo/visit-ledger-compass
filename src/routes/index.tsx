@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Minus, Plus, Check, AlertTriangle, Phone, ChevronLeft, PackagePlus, Flag, RotateCcw } from "lucide-react";
 import {
-  CLIENT, DEMO_LINES, DEMO_NEW, INITIAL_INVENTORY, PRODUCTS, money, reconcile, settlement, sum, type Line, type Lines, type Inv,
+  CLIENT, DEMO_LINES, DEMO_NEW, INITIAL_INVENTORY, PRODUCTS, defaultLines, money, reconcile, setCount, settlement, sum,
+  type CountKey, type Lines, type Inv,
 } from "@/lib/visit";
 
 export const Route = createFileRoute("/")({
@@ -34,17 +35,25 @@ type State = {
 
 const STEPS = ["Cliente", "Inventario", "Liquidación", "Conciliación", "Resumen", "Pago", "Consignación", "Fin"];
 const KEY = "visita-state-v1";
-const zeroLines = () => Object.fromEntries(PRODUCTS.map((p) => [p.id, { sold: 0, returned: 0, lost: 0, physical: 0 }])) as Lines;
 const initial = (): State => ({
-  step: 0, inventory: { ...INITIAL_INVENTORY }, startInventory: { ...INITIAL_INVENTORY }, lines: zeroLines(), balance: CLIENT.previousBalance,
+  step: 0, inventory: { ...INITIAL_INVENTORY }, startInventory: { ...INITIAL_INVENTORY }, lines: defaultLines(INITIAL_INVENTORY), balance: CLIENT.previousBalance,
   charged: 0, payment: 70000, method: "Efectivo", newCons: (Object.fromEntries(PRODUCTS.map((p) => [p.id, 0])) as Inv), consigned: 0,
+});
+
+// Visitas guardadas antes de este cambio: el conteo físico arranca con el inventario.
+const migrate = (v: State): State => ({
+  ...v,
+  lines: Object.fromEntries(PRODUCTS.map((p) => {
+    const l = v.lines[p.id] ?? { sold: 0, returned: 0, lost: 0, physical: 0 };
+    return [p.id, l.physical === 0 && !l.sold && !l.returned && !l.lost ? { ...l, physical: v.startInventory[p.id] } : l];
+  })) as Lines,
 });
 
 function VisitApp() {
   const [s, setS] = useState<State>(initial);
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    try { const raw = localStorage.getItem(KEY); if (raw) { const v = JSON.parse(raw); if (v.startInventory) setS(v); } } catch {}
+    try { const raw = localStorage.getItem(KEY); if (raw) { const v = JSON.parse(raw); if (v.startInventory) setS(migrate(v)); } } catch {}
     setReady(true);
   }, []);
   useEffect(() => { if (ready) localStorage.setItem(KEY, JSON.stringify(s)); }, [s, ready]);
@@ -106,7 +115,7 @@ function VisitApp() {
               {PRODUCTS.map((p) => {
                 const l = s.lines[p.id]; const avail = s.startInventory[p.id];
                 const diff = rec.find((r) => r.product.id === p.id)!.diff;
-                const set = (k: keyof Line) => (v: number) => up({ lines: { ...s.lines, [p.id]: { ...l, [k]: v } } });
+                const set = (k: CountKey) => (v: number) => up({ lines: { ...s.lines, [p.id]: setCount(l, k, v, avail) } });
                 return (
                   <Card key={p.id}>
                     <div className="mb-3 flex items-baseline justify-between">
