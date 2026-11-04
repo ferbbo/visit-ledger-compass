@@ -22,6 +22,7 @@ export const Route = createFileRoute("/")({
 type State = {
   step: number;
   inventory: Inv;
+  startInventory: Inv;
   lines: Lines;
   balance: number; // cuenta corriente
   charged: number;
@@ -35,7 +36,7 @@ const STEPS = ["Cliente", "Inventario", "Liquidación", "Conciliación", "Resume
 const KEY = "visita-state-v1";
 const zeroLines = () => Object.fromEntries(PRODUCTS.map((p) => [p.id, { sold: 0, returned: 0, lost: 0, physical: 0 }])) as Lines;
 const initial = (): State => ({
-  step: 0, inventory: { ...INITIAL_INVENTORY }, lines: zeroLines(), balance: CLIENT.previousBalance,
+  step: 0, inventory: { ...INITIAL_INVENTORY }, startInventory: { ...INITIAL_INVENTORY }, lines: zeroLines(), balance: CLIENT.previousBalance,
   charged: 0, payment: 70000, method: "Efectivo", newCons: (Object.fromEntries(PRODUCTS.map((p) => [p.id, 0])) as Inv), consigned: 0,
 });
 
@@ -43,14 +44,14 @@ function VisitApp() {
   const [s, setS] = useState<State>(initial);
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    try { const raw = localStorage.getItem(KEY); if (raw) setS(JSON.parse(raw)); } catch {}
+    try { const raw = localStorage.getItem(KEY); if (raw) { const v = JSON.parse(raw); if (v.startInventory) setS(v); } } catch {}
     setReady(true);
   }, []);
   useEffect(() => { if (ready) localStorage.setItem(KEY, JSON.stringify(s)); }, [s, ready]);
 
   const up = (p: Partial<State>) => setS((x) => ({ ...x, ...p }));
   const go = (step: number) => { up({ step }); window.scrollTo(0, 0); };
-  const rec = reconcile(s.inventory, s.lines);
+  const rec = reconcile(s.startInventory, s.lines);
   const st = settlement(s.lines);
   const ok = rec.every((r) => r.diff === 0);
   const totalDue = s.balance;
@@ -61,7 +62,7 @@ function VisitApp() {
       <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background shadow-xl">
         <header className="sticky top-0 z-10 border-b bg-background/95 px-4 pb-3 pt-4 backdrop-blur">
           <div className="flex items-center gap-2">
-            {s.step > 0 && s.step < 7 && (
+            {s.step > 0 && s.step < 5 && (
               <button aria-label="Atrás" onClick={() => go(s.step - 1)} className="-ml-2 rounded-full p-2 hover:bg-muted"><ChevronLeft className="h-5 w-5" /></button>
             )}
             <div className="flex-1">
@@ -103,7 +104,7 @@ function VisitApp() {
             <>
               <button onClick={() => up({ lines: structuredClone(DEMO_LINES) })} className="w-full rounded-xl border border-dashed border-primary/50 py-2 text-sm font-medium text-primary">Cargar datos de prueba</button>
               {PRODUCTS.map((p) => {
-                const l = s.lines[p.id]; const avail = s.inventory[p.id];
+                const l = s.lines[p.id]; const avail = s.startInventory[p.id];
                 const diff = rec.find((r) => r.product.id === p.id)!.diff;
                 const set = (k: keyof Line) => (v: number) => up({ lines: { ...s.lines, [p.id]: { ...l, [k]: v } } });
                 return (
@@ -140,7 +141,7 @@ function VisitApp() {
                       <p className="font-semibold">{p.name}</p>
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${diff === 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"}`}>{diff === 0 ? "OK" : `Dif. ${diff > 0 ? "+" : ""}${diff}`}</span>
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{s.inventory[p.id]} − {l.sold} − {l.returned} − {l.lost} − {l.physical} = <b className="text-foreground">{diff}</b></p>
+                    <p className="mt-1 text-sm text-muted-foreground">{s.startInventory[p.id]} − {l.sold} − {l.returned} − {l.lost} − {l.physical} = <b className="text-foreground">{diff}</b></p>
                   </Card>
                 );
               })}
