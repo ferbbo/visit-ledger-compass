@@ -56,11 +56,11 @@ describe("estado guardado", () => {
   ];
   it.each(broken)("ningún estado guardado (%s) deja huecos en la visita", (raw) => {
     const s = loadState(raw);
-    for (const p of ["usb", "usbc", "charger", "hands"]) {
-      expect(typeof s.lines[p.id]?.physical).toBe("number");
-      expect(Number.isFinite(s.inventory[p.id])).toBe(true);
-      expect(Number.isFinite(s.startInventory[p.id])).toBe(true);
-      expect(Number.isFinite(s.newCons[p.id])).toBe(true);
+    for (const id of ["usb", "usbc", "charger", "hands"] as const) {
+      expect(typeof s.lines[id]?.physical).toBe("number");
+      expect(Number.isFinite(s.inventory[id])).toBe(true);
+      expect(Number.isFinite(s.startInventory[id])).toBe(true);
+      expect(Number.isFinite(s.newCons[id])).toBe(true);
     }
     expect(s.step).toBeGreaterThanOrEqual(0);
     expect(s.step).toBeLessThan(8);
