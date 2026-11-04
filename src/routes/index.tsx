@@ -20,61 +20,7 @@ export const Route = createFileRoute("/")({
   component: VisitApp,
 });
 
-type State = {
-  step: number;
-  inventory: Inv;
-  startInventory: Inv;
-  lines: Lines;
-  balance: number; // cuenta corriente
-  charged: number;
-  payment: number;
-  method: string;
-  newCons: Inv;
-  consigned: number;
-};
-
-const STEPS = ["Cliente", "Inventario", "Liquidación", "Conciliación", "Resumen", "Pago", "Consignación", "Fin"];
-type State = {
-  step: number;
-  inventory: Inv;
-  startInventory: Inv;
-  lines: Lines;
-  balance: number; // cuenta corriente
-  charged: number;
-  payment: number;
-  method: string;
-  newCons: Inv;
-  consigned: number;
-};
-
-const STEPS = ["Cliente", "Inventario", "Liquidación", "Conciliación", "Resumen", "Pago", "Consignación", "Fin"];
 const KEY = "visita-state-v1";
-const initial = (): State => ({
-  step: 0, inventory: { ...INITIAL_INVENTORY }, startInventory: { ...INITIAL_INVENTORY }, lines: defaultLines(INITIAL_INVENTORY), balance: CLIENT.previousBalance,
-  charged: 0, payment: 70000, method: "Efectivo", newCons: (Object.fromEntries(PRODUCTS.map((p) => [p.id, 0])) as Inv), consigned: 0,
-});
-
-// Visitas guardadas antes de este cambio: el conteo físico arranca con el inventario.
-const migrate = (v: State): State => ({
-  ...v,
-  lines: Object.fromEntries(PRODUCTS.map((p) => {
-    const l = v.lines[p.id] ?? { sold: 0, returned: 0, lost: 0, physical: 0 };
-    return [p.id, l.physical === 0 && !l.sold && !l.returned && !l.lost ? { ...l, physical: v.startInventory[p.id] } : l];
-  })) as Lines,
-});
-const initial = (): State => ({
-  step: 0, inventory: { ...INITIAL_INVENTORY }, startInventory: { ...INITIAL_INVENTORY }, lines: defaultLines(INITIAL_INVENTORY), balance: CLIENT.previousBalance,
-  charged: 0, payment: 70000, method: "Efectivo", newCons: (Object.fromEntries(PRODUCTS.map((p) => [p.id, 0])) as Inv), consigned: 0,
-});
-
-// Visitas guardadas antes de este cambio: el conteo físico arranca con el inventario.
-const migrate = (v: State): State => ({
-  ...v,
-  lines: Object.fromEntries(PRODUCTS.map((p) => {
-    const l = v.lines[p.id] ?? { sold: 0, returned: 0, lost: 0, physical: 0 };
-    return [p.id, l.physical === 0 && !l.sold && !l.returned && !l.lost ? { ...l, physical: v.startInventory[p.id] } : l];
-  })) as Lines,
-});
 
 function VisitApp() {
   const [s, setS] = useState<State>(initial);
