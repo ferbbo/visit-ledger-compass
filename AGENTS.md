@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Rebuild persisted browser state through a validating loader (`loadState` in `src/lib/visit.ts`) before rendering, and keep the visit math tolerant of missing entries — a half-saved or corrupt visit must degrade to a valid state, never blank the screen.

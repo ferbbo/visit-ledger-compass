@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Minus, Plus, Check, AlertTriangle, Phone, ChevronLeft, PackagePlus, Flag, RotateCcw } from "lucide-react";
 import {
-  CLIENT, DEMO_LINES, DEMO_NEW, INITIAL_INVENTORY, PRODUCTS, money, reconcile, settlement, sum, type Line, type Lines, type Inv,
+  CLIENT, DEMO_LINES, DEMO_NEW, PRODUCTS, METHODS, STEPS, initialState, loadState, money, reconcile, setCount, settlement, sum,
+  type CountKey, type Inv, type State,
 } from "@/lib/visit";
 
 export const Route = createFileRoute("/")({
@@ -19,32 +20,13 @@ export const Route = createFileRoute("/")({
   component: VisitApp,
 });
 
-type State = {
-  step: number;
-  inventory: Inv;
-  startInventory: Inv;
-  lines: Lines;
-  balance: number; // cuenta corriente
-  charged: number;
-  payment: number;
-  method: string;
-  newCons: Inv;
-  consigned: number;
-};
-
-const STEPS = ["Cliente", "Inventario", "Liquidación", "Conciliación", "Resumen", "Pago", "Consignación", "Fin"];
 const KEY = "visita-state-v1";
-const zeroLines = () => Object.fromEntries(PRODUCTS.map((p) => [p.id, { sold: 0, returned: 0, lost: 0, physical: 0 }])) as Lines;
-const initial = (): State => ({
-  step: 0, inventory: { ...INITIAL_INVENTORY }, startInventory: { ...INITIAL_INVENTORY }, lines: zeroLines(), balance: CLIENT.previousBalance,
-  charged: 0, payment: 70000, method: "Efectivo", newCons: (Object.fromEntries(PRODUCTS.map((p) => [p.id, 0])) as Inv), consigned: 0,
-});
 
 function VisitApp() {
-  const [s, setS] = useState<State>(initial);
+  const [s, setS] = useState<State>(initialState);
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    try { const raw = localStorage.getItem(KEY); if (raw) { const v = JSON.parse(raw); if (v.startInventory) setS(v); } } catch {}
+    setS(loadState(localStorage.getItem(KEY)));
     setReady(true);
   }, []);
   useEffect(() => { if (ready) localStorage.setItem(KEY, JSON.stringify(s)); }, [s, ready]);
@@ -69,7 +51,7 @@ function VisitApp() {
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Paso {s.step + 1} de 8</p>
               <h1 className="font-display text-xl font-bold">{STEPS[s.step]}</h1>
             </div>
-            <button aria-label="Reiniciar demo" onClick={() => { if (confirm("¿Reiniciar la demostración?")) setS(initial()); }} className="rounded-full p-2 text-muted-foreground hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>
+            <button aria-label="Reiniciar demo" onClick={() => { if (confirm("¿Reiniciar la demostración?")) setS(initialState()); }} className="rounded-full p-2 text-muted-foreground hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>
           </div>
           <div className="mt-3 flex gap-1">
             {STEPS.map((_, i) => <div key={i} className={`h-1 flex-1 rounded-full ${i <= s.step ? "bg-primary" : "bg-muted"}`} />)}
@@ -103,10 +85,11 @@ function VisitApp() {
           {s.step === 2 && (
             <>
               <button onClick={() => up({ lines: structuredClone(DEMO_LINES) })} className="w-full rounded-xl border border-dashed border-primary/50 py-2 text-sm font-medium text-primary">Cargar datos de prueba</button>
+              <p className="rounded-xl bg-muted/60 p-3 text-xs text-muted-foreground">El conteo <b className="text-foreground">Física</b> arranca con lo registrado en inventario y se baja solo con cada venta, devolución o merma. Escríbelo si el conteo real es otro.</p>
               {PRODUCTS.map((p) => {
                 const l = s.lines[p.id]; const avail = s.startInventory[p.id];
                 const diff = rec.find((r) => r.product.id === p.id)!.diff;
-                const set = (k: keyof Line) => (v: number) => up({ lines: { ...s.lines, [p.id]: { ...l, [k]: v } } });
+                const set = (k: CountKey) => (v: number) => up({ lines: { ...s.lines, [p.id]: setCount(l, k, v, avail) } });
                 return (
                   <Card key={p.id}>
                     <div className="mb-3 flex items-baseline justify-between">
@@ -119,6 +102,10 @@ function VisitApp() {
                       <Stepper label="Mermas" value={l.lost} onChange={set("lost")} max={avail} />
                       <Stepper label="Física" value={l.physical} onChange={set("physical")} max={avail} />
                     </div>
+                    {l.manual && (
+                      <button onClick={() => up({ lines: { ...s.lines, [p.id]: { ...l, manual: false, physical: Math.max(0, avail - l.sold - l.returned - l.lost) } } })}
+                        className="mt-2 text-xs font-medium text-primary underline underline-offset-2">Deshacer conteo manual</button>
+                    )}
                   </Card>
                 );
               })}
@@ -180,7 +167,7 @@ function VisitApp() {
                 </div>
                 <p className="mb-2 mt-4 text-sm font-medium text-muted-foreground">Medio de pago</p>
                 <div className="grid grid-cols-3 gap-2">
-                  {["Efectivo", "Transferencia", "Nequi"].map((m) => (
+                  {METHODS.map((m) => (
                     <button key={m} onClick={() => up({ method: m })} className={`rounded-xl border py-2.5 text-sm font-medium ${s.method === m ? "border-primary bg-primary text-primary-foreground" : ""}`}>{m}</button>
                   ))}
                 </div>
@@ -247,7 +234,7 @@ function VisitApp() {
               }}><PackagePlus className="h-4 w-4" />Consignar</Primary>
             </div>
           )}
-          {s.step === 7 && <Secondary onClick={() => setS(initial())}><RotateCcw className="h-4 w-4" />Nueva demostración</Secondary>}
+          {s.step === 7 && <Secondary onClick={() => setS(initialState())}><RotateCcw className="h-4 w-4" />Nueva demostración</Secondary>}
         </footer>
       </div>
     </div>
