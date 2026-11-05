@@ -16,7 +16,11 @@ export type State = {
   method: string;
   newCons: Inv;
   consigned: number;
+  view: View;
+  validate: boolean; // conteo físico opcional
 };
+export type View = "home" | "liq" | "cons";
+export const LIQ_STEPS = ["Registro", "Resumen", "Pago", "Listo"];
 
 export const PRODUCTS: Product[] = [
   { id: "usb", name: "Cable USB", price: 3000 },
@@ -104,6 +108,8 @@ export function loadState(raw: string | null): State {
     method: isMethod(v.method) ? String(v.method) : METHODS[0],
     newCons: invOf(v.newCons, EMPTY_INV),
     consigned: clampNum(v.consigned, 999999999),
+    view: v.view === "liq" || v.view === "cons" ? v.view : "home",
+    validate: v.validate === true,
   };
 }
 
@@ -119,6 +125,8 @@ export function initialState(): State {
     method: METHODS[0],
     newCons: { ...EMPTY_INV },
     consigned: 0,
+    view: "home",
+    validate: false,
   };
 }
 
