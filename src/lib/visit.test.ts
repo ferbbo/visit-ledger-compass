@@ -98,3 +98,13 @@ describe("estado guardado", () => {
     expect(reconcile(s.startInventory, s.lines).every((r) => r.diff === 0)).toBe(true);
   });
 });
+
+import { searchClients as _sc, openClient as _oc, saveClient as _sv, initialState as _is } from "./visit";
+describe("búsqueda de clientes", () => {
+  it("encuentra sin tildes ni mayúsculas", () => { expect(_sc("medellin").map((c) => c.id)).toEqual(["c3"]); });
+  it("encuentra por teléfono", () => { expect(_sc("0198").map((c) => c.id)).toEqual(["c2"]); });
+  it("guarda el saldo del cliente al volver", () => {
+    const s = _sv({ ..._oc(_is(), "c2"), balance: 5000 });
+    expect(_oc(s, "c2").balance).toBe(5000);
+  });
+});

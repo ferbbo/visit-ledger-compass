@@ -127,7 +127,7 @@ export function loadState(raw: string | null): State {
     method: isMethod(v.method) ? String(v.method) : METHODS[0],
     newCons: invOf(v.newCons, EMPTY_INV),
     consigned: clampNum(v.consigned, 999999999),
-    view: v.view === "liq" || v.view === "cons" ? v.view : "home",
+    view: clientById(v.clientId) && (v.view === "liq" || v.view === "cons") ? v.view : "home",
     validate: v.validate === true,
     clientId: clientById(v.clientId) ? String(v.clientId) : null,
     book: Object.fromEntries(CLIENTS.map((c) => {
