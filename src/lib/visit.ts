@@ -38,7 +38,7 @@ export const CLIENTS: Client[] = [
   { id: "c3", name: "Tecno Ana Gómez", phone: "+57 310 555 0177", city: "Medellín · Laureles", previousBalance: 45000, inventory: { usb: 12, usbc: 6, charger: 2, hands: 6 } },
   { id: "c4", name: "Variedades Pedro", phone: "+57 315 555 0110", city: "Bogotá · Suba", previousBalance: 8000, inventory: { usb: 4, usbc: 4, charger: 4, hands: 2 } },
 ];
-export const CLIENT = CLIENTS[0];
+export const CLIENT: Client = CLIENTS[0]!;
 export const clientById = (id: string | null | undefined) => CLIENTS.find((c) => c.id === id);
 export type Book = Record<string, { inventory: Inv; balance: number }>;
 export const initialBook = (): Book =>
