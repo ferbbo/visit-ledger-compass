@@ -18,6 +18,8 @@ export type State = {
   consigned: number;
   view: View;
   validate: boolean; // conteo físico opcional
+  clientId: string | null; // null = dashboard de búsqueda
+  book: Book; // inventario y saldo guardado por cliente
 };
 export type View = "home" | "liq" | "cons";
 export const LIQ_STEPS = ["Registro", "Resumen", "Pago", "Listo"];
@@ -29,7 +31,24 @@ export const PRODUCTS: Product[] = [
   { id: "hands", name: "Manos libres", price: 7000 },
 ];
 
-export const CLIENT = { name: "Juan Martínez", phone: "+57 300 555 0142", previousBalance: 20000 };
+export type Client = { id: string; name: string; phone: string; city: string; previousBalance: number; inventory: Inv };
+export const CLIENTS: Client[] = [
+  { id: "c1", name: "Juan Martínez", phone: "+57 300 555 0142", city: "Bogotá · Chapinero", previousBalance: 20000, inventory: { usb: 10, usbc: 10, charger: 5, hands: 5 } },
+  { id: "c2", name: "Celulares La 14", phone: "+57 301 555 0198", city: "Cali · Centro", previousBalance: 0, inventory: { usb: 6, usbc: 8, charger: 3, hands: 4 } },
+  { id: "c3", name: "Tecno Ana Gómez", phone: "+57 310 555 0177", city: "Medellín · Laureles", previousBalance: 45000, inventory: { usb: 12, usbc: 6, charger: 2, hands: 6 } },
+  { id: "c4", name: "Variedades Pedro", phone: "+57 315 555 0110", city: "Bogotá · Suba", previousBalance: 8000, inventory: { usb: 4, usbc: 4, charger: 4, hands: 2 } },
+];
+export const CLIENT: Client = CLIENTS[0]!;
+export const clientById = (id: string | null | undefined) => CLIENTS.find((c) => c.id === id);
+export type Book = Record<string, { inventory: Inv; balance: number }>;
+export const initialBook = (): Book =>
+  Object.fromEntries(CLIENTS.map((c) => [c.id, { inventory: { ...c.inventory }, balance: c.previousBalance }]));
+// Filtra por nombre, teléfono o ciudad, sin importar tildes ni mayúsculas.
+const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+export const searchClients = (q: string) => {
+  const n = norm(q.trim()); const d = q.replace(/\D/g, "");
+  return CLIENTS.filter((c) => !n || norm(c.name).includes(n) || norm(c.city).includes(n) || (d.length > 0 && c.phone.replace(/\D/g, "").includes(d)));
+};
 
 export const INITIAL_INVENTORY: Inv = { usb: 10, usbc: 10, charger: 5, hands: 5 };
 
@@ -108,8 +127,13 @@ export function loadState(raw: string | null): State {
     method: isMethod(v.method) ? String(v.method) : METHODS[0],
     newCons: invOf(v.newCons, EMPTY_INV),
     consigned: clampNum(v.consigned, 999999999),
-    view: v.view === "liq" || v.view === "cons" ? v.view : "home",
+    view: clientById(v.clientId) && (v.view === "liq" || v.view === "cons") ? v.view : "home",
     validate: v.validate === true,
+    clientId: clientById(v.clientId) ? String(v.clientId) : null,
+    book: Object.fromEntries(CLIENTS.map((c) => {
+      const e = (v.book && typeof v.book === "object" ? (v.book as Record<string, unknown>)[c.id] : undefined) as { inventory?: unknown; balance?: unknown } | undefined;
+      return [c.id, { inventory: invOf(e?.inventory, c.inventory), balance: Math.round(num(e?.balance, c.previousBalance)) }];
+    })),
   };
 }
 
@@ -127,8 +151,21 @@ export function initialState(): State {
     consigned: 0,
     view: "home",
     validate: false,
+    clientId: null,
+    book: initialBook(),
   };
 }
+
+// Abre la ficha del cliente con su inventario y saldo guardados.
+export function openClient(s: State, id: string): State {
+  const e = s.book[id] ?? initialBook()[id];
+  if (!e) return s;
+  return { ...s, clientId: id, view: "home", step: 0, inventory: { ...e.inventory }, startInventory: { ...e.inventory },
+    lines: defaultLines(e.inventory), balance: e.balance, charged: 0, payment: 0, validate: false, newCons: { ...EMPTY_INV }, consigned: 0 };
+}
+// Guarda lo hecho en la visita dentro del libro del cliente.
+export const saveClient = (s: State): State =>
+  s.clientId ? { ...s, book: { ...s.book, [s.clientId]: { inventory: { ...s.inventory }, balance: s.balance } } } : s;
 
 export const sum = (o: Record<string, number> | undefined) =>
   o ? Object.values(o).reduce((a, b) => a + (Number(b) || 0), 0) : 0;
