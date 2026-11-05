@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { Minus, Plus, Check, AlertTriangle, Phone, ChevronLeft, PackagePlus, RotateCcw, Receipt, ClipboardCheck, ChevronRight } from "lucide-react";
+import { Search, MapPin, Minus, Plus, Check, AlertTriangle, Phone, ChevronLeft, PackagePlus, RotateCcw, Receipt, ClipboardCheck, ChevronRight } from "lucide-react";
 import {
-  CLIENT, DEMO_LINES, DEMO_NEW, PRODUCTS, METHODS, LIQ_STEPS, defaultLines, initialState, loadState, money, reconcile, setCount, settlement, sum,
+  CLIENTS, clientById, searchClients, openClient, saveClient, DEMO_LINES, DEMO_NEW, PRODUCTS, METHODS, LIQ_STEPS, defaultLines, initialState, loadState, money, reconcile, setCount, settlement, sum,
   type CountKey, type Inv, type State, type Lines,
 } from "@/lib/visit";
 
@@ -37,13 +37,20 @@ function VisitApp() {
   const st = settlement(s.lines);
   const ok = !s.validate || rec.every((r) => r.diff === 0);
   const pending = Math.max(0, s.balance - s.payment);
-  const home = (msg = "") => { setNotice(msg); up({ view: "home", step: 0 }); };
+  const [q, setQ] = useState("");
+  const client = clientById(s.clientId);
+  const home = (msg = "") => { setNotice(msg); setS((x) => saveClient({ ...x, view: "home", step: 0 })); window.scrollTo(0, 0); };
+  const toDashboard = () => { setNotice(""); setS((x) => ({ ...saveClient(x), clientId: null, view: "home" })); };
+  const pick = (id: string) => { setNotice(""); setQ(""); setS((x) => openClient(saveClient(x), id)); window.scrollTo(0, 0); };
+  const results = searchClients(q);
+  const initials = (n: string) => n.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
   const startLiq = () => { setNotice(""); up({ view: "liq", step: 0, startInventory: { ...s.inventory }, lines: defaultLines(s.inventory), charged: 0, validate: false }); };
   const startCons = () => { setNotice(""); up({ view: "cons", newCons: { ...EMPTY } }); };
 
-  const title = s.view === "home" ? "Visita comercial" : s.view === "cons" ? "Consignación" : `Liquidación · ${LIQ_STEPS[s.step]}`;
-  const canBack = s.view === "cons" || (s.view === "liq" && s.step <= 1);
+  const title = !client ? "Buscar cliente" : s.view === "home" ? "Visita comercial" : s.view === "cons" ? "Consignación" : `Liquidación · ${LIQ_STEPS[s.step]}`;
+  const canBack = !!client && (s.view === "home" || s.view === "cons" || (s.view === "liq" && s.step <= 1));
+  const back = () => (s.view === "home" ? toDashboard() : s.view === "liq" && s.step === 1 ? up({ step: 0 }) : home());
 
   return (
     <div className="min-h-screen bg-muted/40">
@@ -51,24 +58,52 @@ function VisitApp() {
         <header className="sticky top-0 z-10 border-b bg-background/95 px-4 pb-3 pt-4 backdrop-blur">
           <div className="flex items-center gap-2">
             {canBack && (
-              <button aria-label="Atrás" onClick={() => (s.view === "liq" && s.step === 1 ? up({ step: 0 }) : home())} className="-ml-2 rounded-full p-2 hover:bg-muted"><ChevronLeft className="h-5 w-5" /></button>
+              <button aria-label="Atrás" onClick={back} className="-ml-2 rounded-full p-2 hover:bg-muted"><ChevronLeft className="h-5 w-5" /></button>
             )}
             <h1 className="flex-1 font-display text-xl font-bold">{title}</h1>
-            {s.view === "home" && <button aria-label="Reiniciar demo" onClick={() => { if (confirm("¿Reiniciar la demostración?")) { setNotice(""); setS(initialState()); } }} className="rounded-full p-2 text-muted-foreground hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
+            {!client && <button aria-label="Reiniciar demo" onClick={() => { if (confirm("¿Reiniciar la demostración?")) { setNotice(""); setS(initialState()); } }} className="rounded-full p-2 text-muted-foreground hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
           </div>
           {s.view === "liq" && <div className="mt-3 flex gap-1">{LIQ_STEPS.map((_, i) => <div key={i} className={`h-1 flex-1 rounded-full ${i <= s.step ? "bg-primary" : "bg-muted"}`} />)}</div>}
         </header>
 
         <main className="flex-1 space-y-3 p-4 pb-32">
-          {s.view === "home" && (
+          {!client && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <Stat label="Clientes" value={CLIENTS.length} />
+                <Stat label="Por cobrar" value={money(CLIENTS.reduce((a, c) => a + (s.book[c.id]?.balance ?? 0), 0))} />
+              </div>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <input autoFocus aria-label="Buscar cliente" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, teléfono o ciudad"
+                  className="h-14 w-full rounded-2xl border bg-muted/40 pl-12 pr-4 text-base outline-none focus:ring-2 focus:ring-ring" />
+              </div>
+              {results.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Ningún cliente coincide con "{q}".</p>}
+              {results.map((c) => {
+                const e = s.book[c.id];
+                return (
+                  <button key={c.id} onClick={() => pick(c.id)} className="flex w-full items-center gap-3 rounded-2xl border bg-card p-4 text-left transition active:scale-[0.98]">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 font-display font-bold text-primary">{initials(c.name)}</div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold">{c.name}</p>
+                      <p className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3" />{c.city}</p>
+                    </div>
+                    <div className="text-right"><p className="text-sm font-bold">{money(e?.balance ?? 0)}</p><p className="text-xs text-muted-foreground">{sum(e?.inventory)} u.</p></div>
+                  </button>
+                );
+              })}
+            </>
+          )}
+
+          {client && s.view === "home" && (
             <>
               {notice && <Card className="border-success/40 bg-success/10"><div className="flex items-center gap-2 text-sm font-medium"><Check className="h-4 w-4 text-success" />{notice}</div></Card>}
               <Card>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary font-display text-xl font-bold text-primary-foreground">JM</div>
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary font-display text-xl font-bold text-primary-foreground">{initials(client.name)}</div>
                   <div>
-                    <p className="font-display text-lg font-bold">{CLIENT.name}</p>
-                    <a href={`tel:${CLIENT.phone}`} className="flex items-center gap-1 text-sm text-muted-foreground"><Phone className="h-3.5 w-3.5" />{CLIENT.phone}</a>
+                    <p className="font-display text-lg font-bold">{client.name}</p>
+                    <a href={`tel:${client.phone}`} className="flex items-center gap-1 text-sm text-muted-foreground"><Phone className="h-3.5 w-3.5" />{client.phone}</a>
                   </div>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2">
@@ -175,7 +210,7 @@ function VisitApp() {
               <div className="flex flex-col items-center py-6 text-center">
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-success text-success-foreground"><Check className="h-10 w-10" strokeWidth={3} /></div>
                 <p className="mt-4 font-display text-2xl font-bold">Liquidación registrada</p>
-                <p className="text-sm text-muted-foreground">{CLIENT.name}</p>
+                <p className="text-sm text-muted-foreground">{client?.name}</p>
               </div>
               <Card>
                 <Row label="Unidades vendidas" value={`${st.sold} u.`} />
@@ -202,7 +237,7 @@ function VisitApp() {
           )}
         </main>
 
-        {s.view !== "home" && (
+        {client && s.view !== "home" && (
           <footer className="fixed inset-x-0 bottom-0 z-10 mx-auto max-w-md space-y-2 border-t bg-background/95 p-4 backdrop-blur">
             {s.view === "liq" && s.step === 0 && <Primary disabled={!ok} onClick={() => up({ step: 1 })}>{ok ? "Ver resumen" : "Corrige las diferencias"}</Primary>}
             {s.view === "liq" && s.step === 1 && <Primary onClick={() => {
