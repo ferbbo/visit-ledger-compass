@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ChevronLeft, Plus, Pencil, Trash2, Users, Search, Save, X } from "lucide-react";
+import { ChevronLeft, Plus, Pencil, Trash2, Search, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useClients } from "@/components/clients-provider";
-import { lovable } from "@/integrations/lovable";
+import { AccountControl } from "@/components/account-control";
 import { money, searchClients, type Client } from "@/lib/visit";
 
-export const Route = createFileRoute("/clientes")({
+export const Route = createFileRoute("/_authenticated/clientes")({
   head: () => ({ meta: [
     { title: "Clientes — Visita comercial" }, { name: "description", content: "Crea, actualiza y elimina los clientes de tus visitas comerciales." },
     { property: "og:title", content: "Clientes — Visita comercial" }, { property: "og:description", content: "Administra tu directorio de clientes." },
@@ -36,19 +36,13 @@ function ClientsPage() {
     <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background/95 p-4 backdrop-blur">
       <Button variant="ghost" size="icon" asChild><Link to="/" aria-label="Volver al inicio"><ChevronLeft /></Link></Button>
       <h1 className="flex-1 font-display text-xl font-bold">Clientes</h1>
+      <AccountControl />
       {userId && !editing && <Button size="icon" aria-label="Crear cliente" title="Crear cliente" onClick={() => edit("new")}><Plus /></Button>}
     </header>
     <main className="space-y-4 p-4 pb-28">
       {(failure || error) && <div role="alert" className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm">{failure || error}{error && <Button variant="link" onClick={() => void refresh()}>Reintentar</Button>}</div>}
       {message && <p role="status" className="text-sm text-success">{message}</p>}
-      {loading ? <p className="text-muted-foreground">Cargando clientes…</p> : !userId ? <section className="space-y-4 py-8">
-        <Users className="h-10 w-10 text-primary" /><h2 className="font-display text-2xl font-bold">Tu directorio de clientes</h2>
-        <p className="text-sm text-muted-foreground">Inicia sesión para guardar tus clientes de forma privada.</p>
-        <Button className="h-12 w-full" disabled={busy} onClick={() => void action(async () => {
-          const result = await lovable.auth.signInWithOAuth("lovable", { redirect_uri: window.location.origin + "/clientes" });
-          if (result.error) throw result.error;
-        }, "")}>Continuar con Lovable</Button>
-      </section> : editing ? <form id="client-form" className="space-y-4" onSubmit={(e) => { e.preventDefault(); void action(() => save(fields, editing === "new" ? undefined : editing.id), editing === "new" ? "Cliente creado" : "Cliente actualizado"); }}>
+      {loading ? <p className="text-muted-foreground">Cargando clientes…</p> : editing ? <form id="client-form" className="space-y-4" onSubmit={(e) => { e.preventDefault(); void action(() => save(fields, editing === "new" ? undefined : editing.id), editing === "new" ? "Cliente creado" : "Cliente actualizado"); }}>
         <h2 className="font-display text-xl font-bold">{editing === "new" ? "Nuevo cliente" : "Editar cliente"}</h2>
         {([['name', 'Nombre'], ['phone', 'Teléfono'], ['city', 'Ciudad / zona']] as const).map(([key, label]) => <div key={key}>
           <label htmlFor={key} className="mb-2 block text-sm font-medium">{label}</label>
