@@ -39,15 +39,15 @@ export const CLIENTS: Client[] = [
   { id: "c4", name: "Variedades Pedro", phone: "+57 315 555 0110", city: "Bogotá · Suba", previousBalance: 8000, inventory: { usb: 4, usbc: 4, charger: 4, hands: 2 } },
 ];
 export const CLIENT: Client = CLIENTS[0]!;
-export const clientById = (id: string | null | undefined) => CLIENTS.find((c) => c.id === id);
+export const clientById = (id: string | null | undefined, clients = CLIENTS) => clients.find((c) => c.id === id);
 export type Book = Record<string, { inventory: Inv; balance: number }>;
-export const initialBook = (): Book =>
-  Object.fromEntries(CLIENTS.map((c) => [c.id, { inventory: { ...c.inventory }, balance: c.previousBalance }]));
+export const initialBook = (clients = CLIENTS): Book =>
+  Object.fromEntries(clients.map((c) => [c.id, { inventory: { ...c.inventory }, balance: c.previousBalance }]));
 // Filtra por nombre, teléfono o ciudad, sin importar tildes ni mayúsculas.
 const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-export const searchClients = (q: string) => {
+export const searchClients = (q: string, clients = CLIENTS) => {
   const n = norm(q.trim()); const d = q.replace(/\D/g, "");
-  return CLIENTS.filter((c) => !n || norm(c.name).includes(n) || norm(c.city).includes(n) || (d.length > 0 && c.phone.replace(/\D/g, "").includes(d)));
+  return clients.filter((c) => !n || norm(c.name).includes(n) || norm(c.city).includes(n) || (d.length > 0 && c.phone.replace(/\D/g, "").includes(d)));
 };
 
 export const INITIAL_INVENTORY: Inv = { usb: 10, usbc: 10, charger: 5, hands: 5 };
@@ -95,8 +95,8 @@ const invOf = (v: unknown, fallback: Inv): Inv =>
 
 // Cualquier estado guardado (o corrupto) se reconstruye completo: nunca se confía
 // en que localStorage tenga todas las claves ni los productos.
-export function loadState(raw: string | null): State {
-  const base = initialState();
+export function loadState(raw: string | null, clients = CLIENTS): State {
+  const base = initialState(clients);
   if (!raw) return base;
   let v: Partial<State> | null;
   try { v = JSON.parse(raw) as Partial<State>; } catch { return base; }
@@ -127,17 +127,17 @@ export function loadState(raw: string | null): State {
     method: isMethod(v.method) ? String(v.method) : METHODS[0],
     newCons: invOf(v.newCons, EMPTY_INV),
     consigned: clampNum(v.consigned, 999999999),
-    view: clientById(v.clientId) && (v.view === "liq" || v.view === "cons") ? v.view : "home",
+    view: clientById(v.clientId, clients) && (v.view === "liq" || v.view === "cons") ? v.view : "home",
     validate: v.validate === true,
-    clientId: clientById(v.clientId) ? String(v.clientId) : null,
-    book: Object.fromEntries(CLIENTS.map((c) => {
+    clientId: clientById(v.clientId, clients) ? String(v.clientId) : null,
+    book: Object.fromEntries(clients.map((c) => {
       const e = (v.book && typeof v.book === "object" ? (v.book as Record<string, unknown>)[c.id] : undefined) as { inventory?: unknown; balance?: unknown } | undefined;
       return [c.id, { inventory: invOf(e?.inventory, c.inventory), balance: Math.round(num(e?.balance, c.previousBalance)) }];
     })),
   };
 }
 
-export function initialState(): State {
+export function initialState(clients = CLIENTS): State {
   return {
     step: 0,
     inventory: { ...INITIAL_INVENTORY },
@@ -152,13 +152,13 @@ export function initialState(): State {
     view: "home",
     validate: false,
     clientId: null,
-    book: initialBook(),
+    book: initialBook(clients),
   };
 }
 
 // Abre la ficha del cliente con su inventario y saldo guardados.
-export function openClient(s: State, id: string): State {
-  const e = s.book[id] ?? initialBook()[id];
+export function openClient(s: State, id: string, clients = CLIENTS): State {
+  const e = s.book[id] ?? initialBook(clients)[id];
   if (!e) return s;
   return { ...s, clientId: id, view: "home", step: 0, inventory: { ...e.inventory }, startInventory: { ...e.inventory },
     lines: defaultLines(e.inventory), balance: e.balance, charged: 0, payment: 0, validate: false, newCons: { ...EMPTY_INV }, consigned: 0 };
