@@ -1,8 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
-import { Search, MapPin, Minus, Plus, Check, AlertTriangle, Phone, ChevronLeft, PackagePlus, RotateCcw, Receipt, ClipboardCheck, ChevronRight } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Search, MapPin, Minus, Plus, Check, AlertTriangle, Phone, ChevronLeft, PackagePlus, RotateCcw, Receipt, ClipboardCheck, ChevronRight, Users } from "lucide-react";
+import { useClients } from "@/components/clients-provider";
+import { Button } from "@/components/ui/button";
 import {
-  CLIENTS, clientById, searchClients, openClient, saveClient, DEMO_LINES, DEMO_NEW, PRODUCTS, METHODS, LIQ_STEPS, defaultLines, initialState, loadState, money, reconcile, setCount, settlement, sum,
+  clientById, searchClients, openClient, saveClient, DEMO_LINES, DEMO_NEW, PRODUCTS, METHODS, LIQ_STEPS, defaultLines, initialState, loadState, money, reconcile, setCount, settlement, sum,
   type CountKey, type Inv, type State, type Lines,
 } from "@/lib/visit";
 
@@ -26,11 +28,31 @@ const autoLines = (l: Lines, inv: Inv): Lines =>
   Object.fromEntries(PRODUCTS.map((p) => { const x = l[p.id]; return [p.id, { ...x, manual: false, physical: Math.max(0, inv[p.id] - x.sold - x.returned - x.lost) }]; })) as Lines;
 
 function VisitApp() {
-  const [s, setS] = useState<State>(initialState);
+  const { clients, userId, loading, error, saveVisit } = useClients();
+  const [s, setS] = useState<State>(() => initialState());
   const [ready, setReady] = useState(false);
   const [notice, setNotice] = useState("");
-  useEffect(() => { setS(loadState(localStorage.getItem(KEY))); setReady(true); }, []);
-  useEffect(() => { if (ready) localStorage.setItem(KEY, JSON.stringify(s)); }, [s, ready]);
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState("");
+  const owner = userId ?? "demo";
+  const restored = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading) return;
+    if (restored.current !== owner) {
+      let raw: string | null = null;
+      try { raw = localStorage.getItem(userId ? `${KEY}-${userId}` : KEY); } catch { /* storage unavailable */ }
+      const state = loadState(raw, clients);
+      if (userId) state.book = Object.fromEntries(clients.map((c) => [c.id, { inventory: c.inventory, balance: c.previousBalance }]));
+      setS(state); restored.current = owner; setReady(true);
+    } else {
+      setS((state) => state.clientId && !clientById(state.clientId, clients) ? { ...state, clientId: null, view: "home", step: 0 } : state);
+    }
+  }, [loading, owner, userId, clients]);
+  useEffect(() => {
+    if (ready && !loading && restored.current === owner) {
+      try { localStorage.setItem(userId ? `${KEY}-${userId}` : KEY, JSON.stringify(s)); } catch { /* keep in-memory draft */ }
+    }
+  }, [s, ready, loading, owner, userId]);
 
   const up = (p: Partial<State>) => { setS((x) => ({ ...x, ...p })); window.scrollTo(0, 0); };
   const rec = reconcile(s.startInventory, s.lines);
@@ -38,11 +60,23 @@ function VisitApp() {
   const ok = !s.validate || rec.every((r) => r.diff === 0);
   const pending = Math.max(0, s.balance - s.payment);
   const [q, setQ] = useState("");
-  const client = clientById(s.clientId);
-  const home = (msg = "") => { setNotice(msg); setS((x) => saveClient({ ...x, view: "home", step: 0 })); window.scrollTo(0, 0); };
+  const client = clientById(s.clientId, clients);
+  const home = async (msg = "", state = s) => {
+    setSaving(true); setFailure("");
+    try {
+      if (msg && state.clientId) await saveVisit(state.clientId, state.inventory, state.balance);
+      setNotice(msg); setS(saveClient({ ...state, view: "home", step: 0 })); window.scrollTo(0, 0);
+    } catch (e) { setFailure(e instanceof Error ? e.message : "No se pudo guardar la visita."); }
+    finally { setSaving(false); }
+  };
   const toDashboard = () => { setNotice(""); setS((x) => ({ ...saveClient(x), clientId: null, view: "home" })); };
-  const pick = (id: string) => { setNotice(""); setQ(""); setS((x) => openClient(saveClient(x), id)); window.scrollTo(0, 0); };
-  const results = searchClients(q);
+  const pick = (id: string) => { setNotice(""); setQ(""); setS((x) => {
+    const saved = saveClient(x);
+    const c = clientById(id, clients);
+    if (userId && c) saved.book[id] = { inventory: c.inventory, balance: c.previousBalance };
+    return openClient(saved, id, clients);
+  }); window.scrollTo(0, 0); };
+  const results = searchClients(q, clients);
   const initials = (n: string) => n.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
   const startLiq = () => { setNotice(""); up({ view: "liq", step: 0, startInventory: { ...s.inventory }, lines: defaultLines(s.inventory), charged: 0, validate: false }); };
@@ -61,17 +95,20 @@ function VisitApp() {
               <button aria-label="Atrás" onClick={back} className="-ml-2 rounded-full p-2 hover:bg-muted"><ChevronLeft className="h-5 w-5" /></button>
             )}
             <h1 className="flex-1 font-display text-xl font-bold">{title}</h1>
-            {!client && <button aria-label="Reiniciar demo" onClick={() => { if (confirm("¿Reiniciar la demostración?")) { setNotice(""); setS(initialState()); } }} className="rounded-full p-2 text-muted-foreground hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
+            {!client && !userId && <button aria-label="Reiniciar demo" onClick={() => { if (confirm("¿Reiniciar la demostración?")) { setNotice(""); setS(initialState()); } }} className="rounded-full p-2 text-muted-foreground hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
           </div>
           {s.view === "liq" && <div className="mt-3 flex gap-1">{LIQ_STEPS.map((_, i) => <div key={i} className={`h-1 flex-1 rounded-full ${i <= s.step ? "bg-primary" : "bg-muted"}`} />)}</div>}
         </header>
 
         <main className="flex-1 space-y-3 p-4 pb-32">
+          {(failure || error) && <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">{failure || error}</p>}
+          {loading && <p role="status" className="text-sm text-muted-foreground">Cargando clientes…</p>}
           {!client && (
             <>
+              <Button asChild variant="outline" className="h-14 w-full justify-between"><Link to="/clientes"><span className="flex items-center gap-3"><Users />Clientes</span><ChevronRight /></Link></Button>
               <div className="grid grid-cols-2 gap-2">
-                <Stat label="Clientes" value={CLIENTS.length} />
-                <Stat label="Por cobrar" value={money(CLIENTS.reduce((a, c) => a + (s.book[c.id]?.balance ?? 0), 0))} />
+                <Stat label="Clientes" value={clients.length} />
+                <Stat label="Por cobrar" value={money(clients.reduce((a, c) => a + (userId ? c.previousBalance : s.book[c.id]?.balance ?? 0), 0))} />
               </div>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -80,7 +117,7 @@ function VisitApp() {
               </div>
               {results.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">Ningún cliente coincide con "{q}".</p>}
               {results.map((c) => {
-                const e = s.book[c.id];
+                const e = userId ? { balance: c.previousBalance, inventory: c.inventory } : s.book[c.id];
                 return (
                   <button key={c.id} onClick={() => pick(c.id)} className="flex w-full items-center gap-3 rounded-2xl border bg-card p-4 text-left transition active:scale-[0.98]">
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 font-display font-bold text-primary">{initials(c.name)}</div>
@@ -140,7 +177,7 @@ function VisitApp() {
               )}
               {PRODUCTS.map((p) => {
                 const l = s.lines[p.id]; const avail = s.startInventory[p.id];
-                const diff = rec.find((r) => r.product.id === p.id)!.diff;
+                const diff = rec.find((r) => r.product.id === p.id)?.diff ?? 0;
                 const set = (k: CountKey) => (v: number) => setS((x) => ({ ...x, lines: { ...x.lines, [p.id]: setCount(x.lines[p.id], k, v, avail) } }));
                 return (
                   <Card key={p.id}>
@@ -249,14 +286,13 @@ function VisitApp() {
               if (s.payment > 0 && !confirm(`¿Registrar pago de ${money(s.payment)} en ${s.method}?`)) return;
               up({ balance: s.balance - s.payment, step: 3 });
             }}>{s.payment > 0 ? "Registrar pago" : "Continuar sin pago"}</Primary>}
-            {s.view === "liq" && s.step === 3 && <Primary onClick={() => home("Liquidación registrada")}>Volver al inicio</Primary>}
-            {s.view === "cons" && <Primary disabled={sum(s.newCons) === 0} onClick={() => {
+            {s.view === "liq" && s.step === 3 && <Primary disabled={saving} onClick={() => void home("Liquidación registrada")}>{saving ? "Guardando…" : "Volver al inicio"}</Primary>}
+            {s.view === "cons" && <Primary disabled={sum(s.newCons) === 0 || saving} onClick={() => {
               if (!confirm(`¿Consignar ${sum(s.newCons)} unidades?`)) return;
               const inv = Object.fromEntries(PRODUCTS.map((p) => [p.id, s.inventory[p.id] + s.newCons[p.id]])) as Inv;
               const n = sum(s.newCons);
-              setS((x) => ({ ...x, inventory: inv, consigned: n, newCons: { ...EMPTY } }));
-              home(`${n} unidades consignadas`);
-            }}><PackagePlus className="h-4 w-4" />Consignar</Primary>}
+              void home(`${n} unidades consignadas`, { ...s, inventory: inv, consigned: n, newCons: { ...EMPTY } });
+            }}><PackagePlus className="h-4 w-4" />{saving ? "Guardando…" : "Consignar"}</Primary>}
           </footer>
         )}
       </div>
