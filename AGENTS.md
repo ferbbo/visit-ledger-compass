@@ -12,3 +12,5 @@
 - Rebuild persisted browser state through a validating loader (`loadState` in `src/lib/visit.ts`) before rendering, and keep the visit math tolerant of missing entries — a half-saved or corrupt visit must degrade to a valid state, never blank the screen.
 - Store client records and completed visits in Cloud with owner-scoped RLS; the shared directory provider supplies dashboard and client administration so edits stay consistent.
 - Keep browser visit drafts separated by account and pass the current directory to loadState so custom client IDs survive validated restoration.
+- Keep Clientes under the client-only authenticated layout and retain owner-scoped Cloud policies; route guards hide UI while RLS enforces private data access.
+- Use one root auth subscriber for router invalidation; the directory listens only to synchronize account-owned records and discards stale account requests.
