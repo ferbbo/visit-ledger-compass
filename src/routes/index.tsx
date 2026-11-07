@@ -87,6 +87,8 @@ function VisitApp() {
   const canBack = !!client && (s.view === "home" || s.view === "cons" || (s.view === "liq" && s.step <= 1));
   const back = () => (s.view === "home" ? toDashboard() : s.view === "liq" && s.step === 1 ? up({ step: 0 }) : home());
 
+  if (loading || !ready || restored.current !== owner) return <div className="mx-auto min-h-screen max-w-md bg-background p-4"><p role="status" className="text-sm text-muted-foreground">Cargando clientes…</p></div>;
+
   return (
     <div className="min-h-screen bg-muted/40">
       <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background shadow-xl">

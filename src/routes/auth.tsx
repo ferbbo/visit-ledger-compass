@@ -7,7 +7,7 @@ import { lovable } from "@/integrations/lovable";
 import { authDestination } from "@/lib/auth";
 
 export const Route = createFileRoute("/auth")({
-  validateSearch: (search: Record<string, unknown>) => ({ redirect: authDestination(search.redirect) }),
+  validateSearch: (search: Record<string, unknown>) => ({ redirect: authDestination(search['redirect']) }),
   head: () => ({ meta: [
     { title: "Iniciar sesión — Visita comercial" },
     { name: "description", content: "Accede a tu cuenta y administra tus clientes privados." },
@@ -30,7 +30,11 @@ function AuthPage() {
   const [message, setMessage] = useState("");
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => {
-      if (data.user) void navigate({ to: redirect, replace: true });
+      if (data.user) {
+        const destination = authDestination(sessionStorage.getItem("auth-destination") ?? redirect);
+        sessionStorage.removeItem("auth-destination");
+        void navigate({ to: destination, replace: true });
+      }
     });
   }, [navigate, redirect]);
   function changeMode(next: typeof mode) { setMode(next); setError(""); setMessage(""); setPassword(""); }
