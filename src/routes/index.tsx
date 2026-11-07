@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Search, MapPin, Minus, Plus, Check, AlertTriangle, Phone, ChevronLeft, PackagePlus, RotateCcw, Receipt, ClipboardCheck, ChevronRight, Users } from "lucide-react";
 import { useClients } from "@/components/clients-provider";
 import { Button } from "@/components/ui/button";
+import { AccountControl } from "@/components/account-control";
 import {
   clientById, searchClients, openClient, saveClient, DEMO_LINES, DEMO_NEW, PRODUCTS, METHODS, LIQ_STEPS, defaultLines, initialState, loadState, money, reconcile, setCount, settlement, sum,
   type CountKey, type Inv, type State, type Lines,
@@ -86,6 +87,8 @@ function VisitApp() {
   const canBack = !!client && (s.view === "home" || s.view === "cons" || (s.view === "liq" && s.step <= 1));
   const back = () => (s.view === "home" ? toDashboard() : s.view === "liq" && s.step === 1 ? up({ step: 0 }) : home());
 
+  if (loading || !ready || restored.current !== owner) return <div className="mx-auto min-h-screen max-w-md bg-background p-4"><p role="status" className="text-sm text-muted-foreground">Cargando clientes…</p></div>;
+
   return (
     <div className="min-h-screen bg-muted/40">
       <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background shadow-xl">
@@ -95,6 +98,7 @@ function VisitApp() {
               <button aria-label="Atrás" onClick={back} className="-ml-2 rounded-full p-2 hover:bg-muted"><ChevronLeft className="h-5 w-5" /></button>
             )}
             <h1 className="flex-1 font-display text-xl font-bold">{title}</h1>
+            <AccountControl />
             {!client && !userId && <button aria-label="Reiniciar demo" onClick={() => { if (confirm("¿Reiniciar la demostración?")) { setNotice(""); setS(initialState()); } }} className="rounded-full p-2 text-muted-foreground hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
           </div>
           {s.view === "liq" && <div className="mt-3 flex gap-1">{LIQ_STEPS.map((_, i) => <div key={i} className={`h-1 flex-1 rounded-full ${i <= s.step ? "bg-primary" : "bg-muted"}`} />)}</div>}
@@ -103,7 +107,7 @@ function VisitApp() {
         <main className="flex-1 space-y-3 p-4 pb-32">
           {(failure || error) && <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">{failure || error}</p>}
           {loading && <p role="status" className="text-sm text-muted-foreground">Cargando clientes…</p>}
-          {!client && (
+          {!loading && restored.current === owner && !client && (
             <>
               <Button asChild variant="outline" className="h-14 w-full justify-between"><Link to="/clientes"><span className="flex items-center gap-3"><Users />Clientes</span><ChevronRight /></Link></Button>
               <div className="grid grid-cols-2 gap-2">
@@ -132,7 +136,7 @@ function VisitApp() {
             </>
           )}
 
-          {client && s.view === "home" && (
+          {!loading && restored.current === owner && client && s.view === "home" && (
             <>
               {notice && <Card className="border-success/40 bg-success/10"><div className="flex items-center gap-2 text-sm font-medium"><Check className="h-4 w-4 text-success" />{notice}</div></Card>}
               <Card>

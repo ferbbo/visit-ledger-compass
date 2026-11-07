@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CLIENTS, PRODUCTS, type Client, type Inv } from "@/lib/visit";
 
@@ -15,15 +15,19 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const generation = useRef(0);
   async function refresh() {
+    const request = ++generation.current;
     setError("");
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (request !== generation.current) return;
     setUserId(user?.id ?? null);
     if (!user) { setClients(CLIENTS); setLoading(false); return; }
     if (authError) throw authError;
     const rows = [];
     for (let start = 0; ; start += 1000) {
-      const { data, error } = await supabase.from("clients").select("*").order("created_at").range(start, start + 999);
+      const { data, error } = await supabase.from("clients").select("*").eq("owner_id", user.id).order("created_at").range(start, start + 999);
+      if (request !== generation.current) return;
       if (error) { setError("No se pudieron cargar los clientes. Intenta de nuevo."); setLoading(false); return; }
       rows.push(...data);
       if (data.length < 1000) break;
@@ -35,7 +39,10 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh().catch(() => { setError("No se pudo conectar. Intenta de nuevo."); setLoading(false); });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") { setLoading(true); setTimeout(() => void refresh(), 0); }
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        ++generation.current; setClients([]); setUserId(null); setLoading(true);
+        setTimeout(() => void refresh().catch(() => { setError("No se pudo conectar. Intenta de nuevo."); setLoading(false); }), 0);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
