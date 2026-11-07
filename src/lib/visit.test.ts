@@ -101,6 +101,21 @@ describe("estado guardado", () => {
 
 import { searchClients as _sc, openClient as _oc, saveClient as _sv, initialState as _is } from "./visit";
 describe("búsqueda de clientes", () => {
+  it("reconstruye la visita de un cliente creado sin perder su inventario", () => {
+    const clients = [{ id: "nuevo", name: "Cliente nuevo", phone: "3001234567", city: "Cali", previousBalance: 0, inventory: { usb: 4, usbc: 0, charger: 0, hands: 0 } }];
+    const state = _oc(_is(clients), "nuevo", clients);
+    const restored = loadState(JSON.stringify({ ...state, view: "cons" }), clients);
+    expect(restored.clientId).toBe("nuevo");
+    expect(restored.inventory.usb).toBe(4);
+    expect(restored.book.nuevo.balance).toBe(0);
+    expect(_sc("nuevo", clients).map((c) => c.id)).toEqual(["nuevo"]);
+  });
+  it("un cliente eliminado no reaparece al restaurar su visita", () => {
+    const restored = loadState(JSON.stringify(_oc(_is(), "c1")), []);
+    expect(restored.clientId).toBe(null);
+    expect(restored.book).toEqual({});
+    expect(restored.view).toBe("home");
+  });
   it("encuentra sin tildes ni mayúsculas", () => { expect(_sc("medellin").map((c) => c.id)).toEqual(["c3"]); });
   it("encuentra por teléfono", () => { expect(_sc("0198").map((c) => c.id)).toEqual(["c2"]); });
   it("guarda el saldo del cliente al volver", () => {
