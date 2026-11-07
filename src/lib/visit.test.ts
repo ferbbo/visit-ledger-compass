@@ -107,7 +107,7 @@ describe("búsqueda de clientes", () => {
     const restored = loadState(JSON.stringify({ ...state, view: "cons" }), clients);
     expect(restored.clientId).toBe("nuevo");
     expect(restored.inventory.usb).toBe(4);
-    expect(restored.book.nuevo.balance).toBe(0);
+    expect(restored.book['nuevo']?.balance).toBe(0);
     expect(_sc("nuevo", clients).map((c) => c.id)).toEqual(["nuevo"]);
   });
   it("un cliente eliminado no reaparece al restaurar su visita", () => {
