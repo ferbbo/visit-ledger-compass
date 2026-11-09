@@ -14,3 +14,4 @@
 - Keep browser visit drafts separated by account and pass the current directory to loadState so custom client IDs survive validated restoration.
 - Keep Clientes under the client-only authenticated layout and retain owner-scoped Cloud policies; route guards hide UI while RLS enforces private data access.
 - Use one root auth subscriber for router invalidation; the directory listens only to synchronize account-owned records and discards stale account requests.
+- Product catalog is per-account in Cloud; visit math takes the products list as a parameter (defaulting to the base catalog) so custom products flow through liquidation and consignment.
