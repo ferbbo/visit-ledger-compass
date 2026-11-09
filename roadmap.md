@@ -5,3 +5,6 @@
 - [x] Implementar inicio de sesión, registro y recuperación.
 - [x] Proteger Clientes y limpiar datos al cerrar sesión.
 - [ ] Verificar acceso privado y persistencia con una sesión real: no hay cuentas registradas y no se pudo preparar una sesión.
+
+- [ ] Módulo Catálogo: crear, editar y eliminar productos
+- [ ] Catálogo exige iniciar sesión o crear cuenta
