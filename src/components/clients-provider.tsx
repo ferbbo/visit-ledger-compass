@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { CLIENTS, PRODUCTS, type Client, type Inv } from "@/lib/visit";
+import { CLIENTS, PRODUCTS, type Client, type Inv, type Product } from "@/lib/visit";
 
 type Directory = {
   clients: Client[]; userId: string | null; loading: boolean; error: string;
@@ -8,6 +8,9 @@ type Directory = {
   save: (fields: { name: string; phone: string; city: string }, id?: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
   saveVisit: (id: string, inventory: Inv, balance: number) => Promise<void>;
+  products: Product[];
+  saveProduct: (fields: { name: string; price: number }, id?: string) => Promise<void>;
+  removeProduct: (id: string) => Promise<void>;
 };
 const Context = createContext<Directory | null>(null);
 export function ClientsProvider({ children }: { children: ReactNode }) {
@@ -15,6 +18,8 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [custom, setCustom] = useState(false);
   const generation = useRef(0);
   async function refresh() {
     const request = ++generation.current;
@@ -22,8 +27,13 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (request !== generation.current) return;
     setUserId(user?.id ?? null);
-    if (!user) { setClients(CLIENTS); setLoading(false); return; }
+    if (!user) { setClients(CLIENTS); setProducts(PRODUCTS); setCustom(false); setLoading(false); return; }
     if (authError) throw authError;
+    const catalog = await supabase.from("products").select("id,name,price").eq("owner_id", user.id).order("created_at");
+    if (request !== generation.current) return;
+    if (catalog.error) { setError("No se pudo cargar el catálogo. Intenta de nuevo."); setLoading(false); return; }
+    const list = catalog.data.length ? catalog.data.map((p) => ({ id: p.id, name: p.name, price: Number(p.price) })) : PRODUCTS;
+    setProducts(list); setCustom(catalog.data.length > 0);
     const rows = [];
     for (let start = 0; ; start += 1000) {
       const { data, error } = await supabase.from("clients").select("*").eq("owner_id", user.id).order("created_at").range(start, start + 999);
@@ -33,7 +43,7 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
       if (data.length < 1000) break;
     }
     setClients(rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone, city: r.city, previousBalance: Number(r.balance),
-      inventory: Object.fromEntries(PRODUCTS.map((p) => [p.id, Math.max(0, Number((r.inventory as Record<string, unknown>)?.[p.id]) || 0)])) as Inv })));
+      inventory: Object.fromEntries(list.map((p) => [p.id, Math.max(0, Number((r.inventory as Record<string, unknown>)?.[p.id]) || 0)])) as Inv })));
     setLoading(false);
   }
   useEffect(() => {
@@ -67,7 +77,34 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error("No se pudo guardar la visita. Intenta de nuevo.");
     await refresh();
   }
-  return <Context.Provider value={{ clients, userId, loading, error, refresh, save, remove, saveVisit }}>{children}</Context.Provider>;
+  // El catálogo base se guarda en la cuenta la primera vez que se edita.
+  async function materialize() {
+    if (custom || !userId) return;
+    const { error } = await supabase.from("products").upsert(PRODUCTS.map((p) => ({ owner_id: userId, id: p.id, name: p.name, price: p.price })), { onConflict: "owner_id,id" });
+    if (error) throw new Error("No se pudo guardar el catálogo. Intenta de nuevo.");
+  }
+  async function saveProduct(fields: { name: string; price: number }, id?: string) {
+    requireUser();
+    const name = fields.name.trim(); const price = Math.round(Number(fields.price));
+    if (!name) throw new Error("Escribe el nombre del producto.");
+    if (!Number.isFinite(price) || price < 0) throw new Error("Escribe un precio válido.");
+    await materialize();
+    const { error } = id ? await supabase.from("products").update({ name, price }).eq("owner_id", userId!).eq("id", id).select().single()
+      : await supabase.from("products").insert({ owner_id: userId!, name, price });
+    if (error) throw new Error("No se pudo guardar el producto. Intenta de nuevo.");
+    await refresh();
+  }
+  async function removeProduct(id: string) {
+    requireUser();
+    const holders = clients.filter((c) => (c.inventory[id] ?? 0) > 0).length;
+    if (holders) throw new Error(`No se puede eliminar: ${holders} cliente(s) aún tienen unidades de este producto.`);
+    if (products.length <= 1) throw new Error("El catálogo debe tener al menos un producto.");
+    await materialize();
+    const { error } = await supabase.from("products").delete().eq("owner_id", userId!).eq("id", id).select().single();
+    if (error) throw new Error("No se pudo eliminar el producto. Intenta de nuevo.");
+    await refresh();
+  }
+  return <Context.Provider value={{ clients, userId, loading, error, refresh, save, remove, saveVisit, products, saveProduct, removeProduct }}>{children}</Context.Provider>;
 }
 export function useClients() {
   const value = useContext(Context);

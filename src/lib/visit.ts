@@ -1,4 +1,4 @@
-export type ProductId = "usb" | "usbc" | "charger" | "hands";
+export type ProductId = string;
 export type Inv = Record<ProductId, number>;
 export type Lines = Record<ProductId, Line>;
 export type Product = { id: ProductId; name: string; price: number };
@@ -65,11 +65,11 @@ export const STEPS = ["Cliente", "Inventario", "Liquidación", "Conciliación", 
 export const METHODS = ["Efectivo", "Transferencia", "Nequi"] as const;
 const isMethod = (m: unknown) => (METHODS as readonly string[]).includes(String(m));
 
-const EMPTY_INV: Inv = { usb: 0, usbc: 0, charger: 0, hands: 0 };
+export const emptyInv = (products = PRODUCTS): Inv => Object.fromEntries(products.map((p) => [p.id, 0]));
 
 // El conteo físico arranca con lo que hay registrado en inventario.
-export const defaultLines = (inv: Inv | undefined): Lines =>
-  Object.fromEntries(PRODUCTS.map((p) => [p.id, { sold: 0, returned: 0, lost: 0, physical: inv?.[p.id] ?? 0 }])) as Lines;
+export const defaultLines = (inv: Inv | undefined, products = PRODUCTS): Lines =>
+  Object.fromEntries(products.map((p) => [p.id, { sold: 0, returned: 0, lost: 0, physical: inv?.[p.id] ?? 0 }])) as Lines;
 
 // Al registrar vendidas/devueltas/mermas, el conteo físico se ajusta solo
 // (inventario − movimientos). Editarlo a mano lo deja como conteo real del cliente.
@@ -87,26 +87,26 @@ const num = (v: unknown, fallback = 0) => {
 };
 const clampNum = (v: unknown, max: number) => Math.max(0, Math.min(Math.max(0, Math.round(max)), Math.round(num(v, 0))));
 
-const invOf = (v: unknown, fallback: Inv): Inv =>
-  Object.fromEntries(PRODUCTS.map((p) => {
+const invOf = (v: unknown, fallback: Inv, products = PRODUCTS): Inv =>
+  Object.fromEntries(products.map((p) => {
     const raw = (v as Record<string, unknown> | null | undefined)?.[p.id];
-    return [p.id, clampNum(raw ?? fallback[p.id], 9999)];
+    return [p.id, clampNum(raw ?? fallback[p.id] ?? 0, 9999)];
   })) as Inv;
 
 // Cualquier estado guardado (o corrupto) se reconstruye completo: nunca se confía
 // en que localStorage tenga todas las claves ni los productos.
-export function loadState(raw: string | null, clients = CLIENTS): State {
-  const base = initialState(clients);
+export function loadState(raw: string | null, clients = CLIENTS, products = PRODUCTS): State {
+  const base = initialState(clients, products);
   if (!raw) return base;
   let v: Partial<State> | null;
   try { v = JSON.parse(raw) as Partial<State>; } catch { return base; }
   if (!v || typeof v !== "object" || Array.isArray(v)) return base;
 
-  const startInventory = invOf(v.startInventory, base.startInventory);
+  const startInventory = invOf(v.startInventory, base.startInventory, products);
   const rawLines = (v.lines && typeof v.lines === "object" ? v.lines : {}) as Record<string, Partial<Line> | undefined>;
-  const lines = Object.fromEntries(PRODUCTS.map((p) => {
+  const lines = Object.fromEntries(products.map((p) => {
     const src = rawLines[p.id] ?? {};
-    const available = startInventory[p.id];
+    const available = startInventory[p.id] ?? 0;
     const sold = clampNum(src.sold, available);
     const returned = clampNum(src.returned, available);
     const lost = clampNum(src.lost, available);
@@ -118,36 +118,36 @@ export function loadState(raw: string | null, clients = CLIENTS): State {
   const balance = Math.round(num(v.balance, base.balance));
   return {
     step: Math.max(0, Math.min(STEPS.length - 1, Math.round(num(v.step, 0)))),
-    inventory: invOf(v.inventory, startInventory),
+    inventory: invOf(v.inventory, startInventory, products),
     startInventory,
     lines,
     balance,
     charged: clampNum(v.charged, 999999999),
     payment: v.payment == null ? base.payment : clampNum(v.payment, 999999999),
     method: isMethod(v.method) ? String(v.method) : METHODS[0],
-    newCons: invOf(v.newCons, EMPTY_INV),
+    newCons: invOf(v.newCons, emptyInv(products), products),
     consigned: clampNum(v.consigned, 999999999),
     view: clientById(v.clientId, clients) && (v.view === "liq" || v.view === "cons") ? v.view : "home",
     validate: v.validate === true,
     clientId: clientById(v.clientId, clients) ? String(v.clientId) : null,
     book: Object.fromEntries(clients.map((c) => {
       const e = (v.book && typeof v.book === "object" ? (v.book as Record<string, unknown>)[c.id] : undefined) as { inventory?: unknown; balance?: unknown } | undefined;
-      return [c.id, { inventory: invOf(e?.inventory, c.inventory), balance: Math.round(num(e?.balance, c.previousBalance)) }];
+      return [c.id, { inventory: invOf(e?.inventory, c.inventory, products), balance: Math.round(num(e?.balance, c.previousBalance)) }];
     })),
   };
 }
 
-export function initialState(clients = CLIENTS): State {
+export function initialState(clients = CLIENTS, products = PRODUCTS): State {
   return {
     step: 0,
     inventory: { ...INITIAL_INVENTORY },
     startInventory: { ...INITIAL_INVENTORY },
-    lines: defaultLines(INITIAL_INVENTORY),
+    lines: defaultLines(INITIAL_INVENTORY, products),
     balance: CLIENT.previousBalance,
     charged: 0,
     payment: 70000,
     method: METHODS[0],
-    newCons: { ...EMPTY_INV },
+    newCons: emptyInv(products),
     consigned: 0,
     view: "home",
     validate: false,
@@ -157,11 +157,11 @@ export function initialState(clients = CLIENTS): State {
 }
 
 // Abre la ficha del cliente con su inventario y saldo guardados.
-export function openClient(s: State, id: string, clients = CLIENTS): State {
+export function openClient(s: State, id: string, clients = CLIENTS, products = PRODUCTS): State {
   const e = s.book[id] ?? initialBook(clients)[id];
   if (!e) return s;
   return { ...s, clientId: id, view: "home", step: 0, inventory: { ...e.inventory }, startInventory: { ...e.inventory },
-    lines: defaultLines(e.inventory), balance: e.balance, charged: 0, payment: 0, validate: false, newCons: { ...EMPTY_INV }, consigned: 0 };
+    lines: defaultLines(e.inventory, products), balance: e.balance, charged: 0, payment: 0, validate: false, newCons: emptyInv(products), consigned: 0 };
 }
 // Guarda lo hecho en la visita dentro del libro del cliente.
 export const saveClient = (s: State): State =>
@@ -170,20 +170,20 @@ export const saveClient = (s: State): State =>
 export const sum = (o: Record<string, number> | undefined) =>
   o ? Object.values(o).reduce((a, b) => a + (Number(b) || 0), 0) : 0;
 
-const safeLine = (l: Line | undefined): Line => l ?? { sold: 0, returned: 0, lost: 0, physical: 0 };
+export const safeLine = (l: Line | undefined): Line => l ?? { sold: 0, returned: 0, lost: 0, physical: 0 };
 
 export function difference(available: number, l: Line | undefined) {
   const x = safeLine(l);
   return available - x.sold - x.returned - x.lost - x.physical;
 }
 
-export function reconcile(inv: Inv | undefined, lines: Lines | undefined) {
-  return PRODUCTS.map((p) => ({ product: p, diff: difference(inv?.[p.id] ?? 0, lines?.[p.id]) }));
+export function reconcile(inv: Inv | undefined, lines: Lines | undefined, products = PRODUCTS) {
+  return products.map((p) => ({ product: p, diff: difference(inv?.[p.id] ?? 0, lines?.[p.id]) }));
 }
 
-export function settlement(lines: Lines | undefined) {
+export function settlement(lines: Lines | undefined, products = PRODUCTS) {
   let sold = 0, returned = 0, lost = 0, remaining = 0, total = 0;
-  for (const p of PRODUCTS) {
+  for (const p of products) {
     const l = safeLine(lines?.[p.id]);
     sold += l.sold; returned += l.returned; lost += l.lost; remaining += l.physical;
     total += l.sold * p.price; // mermas y devoluciones no generan cargo

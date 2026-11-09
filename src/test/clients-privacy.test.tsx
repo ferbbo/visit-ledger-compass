@@ -14,7 +14,7 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: {
   },
   from: () => ({ select: () => ({ eq: (_key: string, owner: string) => {
     mocked.owners.push(owner);
-    return { order: () => ({ range: async () => ({ error: null, data: [{ id: owner, name: `Cliente ${owner}`, phone: "", city: "", balance: 0, inventory: {} }] }) }) };
+    return { order: () => ({ then: (ok: (v: unknown) => unknown) => Promise.resolve({ error: null, data: [] }).then(ok), range: async () => ({ error: null, data: [{ id: owner, name: `Cliente ${owner}`, phone: "", city: "", balance: 0, inventory: {} }] }) }) };
   } }) }),
 } }));
 function Directory() {
@@ -28,7 +28,7 @@ it("replaces private clients when accounts change and clears them on sign-out", 
   act(() => { mocked.user = "account-b"; mocked.listener("SIGNED_IN"); });
   await screen.findByText("Cliente account-b");
   expect(screen.queryByText("Cliente account-a")).not.toBeInTheDocument();
-  expect(mocked.owners).toEqual(["account-a", "account-b"]);
+  expect([...new Set(mocked.owners)]).toEqual(["account-a", "account-b"]);
   act(() => { mocked.user = null; mocked.listener("SIGNED_OUT"); });
   await waitFor(() => expect(screen.queryByText("loading")).not.toBeInTheDocument());
   expect(screen.queryByText("Cliente account-b")).not.toBeInTheDocument();

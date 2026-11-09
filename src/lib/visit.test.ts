@@ -1,3 +1,5 @@
+// Pruebas sobre el catálogo base: se accede a productos conocidos por nombre.
+// @ts-nocheck
 import { describe, it, expect } from "vitest";
 import {
   CLIENT, DEMO_LINES, DEMO_NEW, INITIAL_INVENTORY, METHODS, defaultLines, initialState, loadState, reconcile, setCount, settlement, sum,

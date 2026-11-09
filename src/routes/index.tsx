@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Search, MapPin, Minus, Plus, Check, AlertTriangle, Phone, ChevronLeft, PackagePlus, RotateCcw, Receipt, ClipboardCheck, ChevronRight, Users } from "lucide-react";
+import { Search, MapPin, Minus, Plus, Check, AlertTriangle, Phone, ChevronLeft, PackagePlus, RotateCcw, Receipt, ClipboardCheck, ChevronRight, Users, Package } from "lucide-react";
 import { useClients } from "@/components/clients-provider";
 import { Button } from "@/components/ui/button";
 import { AccountControl } from "@/components/account-control";
 import {
-  clientById, searchClients, openClient, saveClient, DEMO_LINES, DEMO_NEW, PRODUCTS, METHODS, LIQ_STEPS, defaultLines, initialState, loadState, money, reconcile, setCount, settlement, sum,
+  clientById, searchClients, openClient, saveClient, DEMO_LINES, DEMO_NEW, PRODUCTS, METHODS, LIQ_STEPS, defaultLines, emptyInv, safeLine, initialState, loadState, money, reconcile, setCount, settlement, sum,
   type CountKey, type Inv, type State, type Lines,
 } from "@/lib/visit";
 
@@ -24,12 +24,12 @@ export const Route = createFileRoute("/")({
 });
 
 const KEY = "visita-state-v1";
-const EMPTY: Inv = { usb: 0, usbc: 0, charger: 0, hands: 0 };
-const autoLines = (l: Lines, inv: Inv): Lines =>
-  Object.fromEntries(PRODUCTS.map((p) => { const x = l[p.id]; return [p.id, { ...x, manual: false, physical: Math.max(0, inv[p.id] - x.sold - x.returned - x.lost) }]; })) as Lines;
+const autoLines = (l: Lines, inv: Inv, products = PRODUCTS): Lines =>
+  Object.fromEntries(products.map((p) => { const x = safeLine(l[p.id]); return [p.id, { ...x, manual: false, physical: Math.max(0, (inv[p.id] ?? 0) - x.sold - x.returned - x.lost) }]; })) as Lines;
 
 function VisitApp() {
-  const { clients, userId, loading, error, saveVisit } = useClients();
+  const { clients, userId, loading, error, saveVisit, products } = useClients();
+  const EMPTY = emptyInv(products);
   const [s, setS] = useState<State>(() => initialState());
   const [ready, setReady] = useState(false);
   const [notice, setNotice] = useState("");
@@ -42,13 +42,13 @@ function VisitApp() {
     if (restored.current !== owner) {
       let raw: string | null = null;
       try { raw = localStorage.getItem(userId ? `${KEY}-${userId}` : KEY); } catch { /* storage unavailable */ }
-      const state = loadState(raw, clients);
+      const state = loadState(raw, clients, products);
       if (userId) state.book = Object.fromEntries(clients.map((c) => [c.id, { inventory: c.inventory, balance: c.previousBalance }]));
       setS(state); restored.current = owner; setReady(true);
     } else {
       setS((state) => state.clientId && !clientById(state.clientId, clients) ? { ...state, clientId: null, view: "home", step: 0 } : state);
     }
-  }, [loading, owner, userId, clients]);
+  }, [loading, owner, userId, clients, products]);
   useEffect(() => {
     if (ready && !loading && restored.current === owner) {
       try { localStorage.setItem(userId ? `${KEY}-${userId}` : KEY, JSON.stringify(s)); } catch { /* keep in-memory draft */ }
@@ -56,8 +56,8 @@ function VisitApp() {
   }, [s, ready, loading, owner, userId]);
 
   const up = (p: Partial<State>) => { setS((x) => ({ ...x, ...p })); window.scrollTo(0, 0); };
-  const rec = reconcile(s.startInventory, s.lines);
-  const st = settlement(s.lines);
+  const rec = reconcile(s.startInventory, s.lines, products);
+  const st = settlement(s.lines, products);
   const ok = !s.validate || rec.every((r) => r.diff === 0);
   const pending = Math.max(0, s.balance - s.payment);
   const [q, setQ] = useState("");
@@ -75,12 +75,12 @@ function VisitApp() {
     const saved = saveClient(x);
     const c = clientById(id, clients);
     if (userId && c) saved.book[id] = { inventory: c.inventory, balance: c.previousBalance };
-    return openClient(saved, id, clients);
+    return openClient(saved, id, clients, products);
   }); window.scrollTo(0, 0); };
   const results = searchClients(q, clients);
   const initials = (n: string) => n.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
-  const startLiq = () => { setNotice(""); up({ view: "liq", step: 0, startInventory: { ...s.inventory }, lines: defaultLines(s.inventory), charged: 0, validate: false }); };
+  const startLiq = () => { setNotice(""); up({ view: "liq", step: 0, startInventory: { ...s.inventory }, lines: defaultLines(s.inventory, products), charged: 0, validate: false }); };
   const startCons = () => { setNotice(""); up({ view: "cons", newCons: { ...EMPTY } }); };
 
   const title = !client ? "Buscar cliente" : s.view === "home" ? "Visita comercial" : s.view === "cons" ? "Consignación" : `Liquidación · ${LIQ_STEPS[s.step]}`;
@@ -99,7 +99,7 @@ function VisitApp() {
             )}
             <h1 className="flex-1 font-display text-xl font-bold">{title}</h1>
             <AccountControl />
-            {!client && !userId && <button aria-label="Reiniciar demo" onClick={() => { if (confirm("¿Reiniciar la demostración?")) { setNotice(""); setS(initialState()); } }} className="rounded-full p-2 text-muted-foreground hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
+            {!client && !userId && <button aria-label="Reiniciar demo" onClick={() => { if (confirm("¿Reiniciar la demostración?")) { setNotice(""); setS(initialState(clients, products)); } }} className="rounded-full p-2 text-muted-foreground hover:bg-muted"><RotateCcw className="h-4 w-4" /></button>}
           </div>
           {s.view === "liq" && <div className="mt-3 flex gap-1">{LIQ_STEPS.map((_, i) => <div key={i} className={`h-1 flex-1 rounded-full ${i <= s.step ? "bg-primary" : "bg-muted"}`} />)}</div>}
         </header>
@@ -110,6 +110,9 @@ function VisitApp() {
           {!loading && restored.current === owner && !client && (
             <>
               <Button asChild variant="outline" className="h-14 w-full justify-between"><Link to="/clientes"><span className="flex items-center gap-3"><Users />Clientes</span><ChevronRight /></Link></Button>
+              <Button asChild variant="outline" className="h-14 w-full justify-between">{userId
+                ? <Link to="/catalogo"><span className="flex items-center gap-3"><Package />Catálogo</span><ChevronRight /></Link>
+                : <Link to="/auth" search={{ redirect: "/catalogo" }}><span className="flex items-center gap-3"><Package />Catálogo</span><span className="text-xs text-muted-foreground">Inicia sesión</span></Link>}</Button>
               <div className="grid grid-cols-2 gap-2">
                 <Stat label="Clientes" value={clients.length} />
                 <Stat label="Por cobrar" value={money(clients.reduce((a, c) => a + (userId ? c.previousBalance : s.book[c.id]?.balance ?? 0), 0))} />
@@ -157,19 +160,19 @@ function VisitApp() {
               <Module icon={<PackagePlus className="h-6 w-6" />} title="Consignación" desc="Entrega mercancía nueva. No genera cargos." onClick={startCons} />
               <Card>
                 <p className="mb-2 text-sm font-semibold">Inventario en el cliente</p>
-                {PRODUCTS.map((p) => <Row key={p.id} label={`${p.name} · ${money(p.price)}`} value={`${s.inventory[p.id]} u.`} />)}
+                {products.map((p) => <Row key={p.id} label={`${p.name} · ${money(p.price)}`} value={`${s.inventory[p.id] ?? 0} u.`} />)}
               </Card>
             </>
           )}
 
           {s.view === "liq" && s.step === 0 && (
             <>
-              <button onClick={() => setS((x) => ({ ...x, lines: x.validate ? structuredClone(DEMO_LINES) : autoLines(structuredClone(DEMO_LINES), x.startInventory) }))} className="w-full rounded-xl border border-dashed border-primary/50 py-2 text-sm font-medium text-primary">Cargar datos de prueba</button>
+              <button onClick={() => setS((x) => ({ ...x, lines: x.validate ? structuredClone(DEMO_LINES) : autoLines(structuredClone(DEMO_LINES), x.startInventory, products) }))} className="w-full rounded-xl border border-dashed border-primary/50 py-2 text-sm font-medium text-primary">Cargar datos de prueba</button>
               <Card className="flex items-center gap-3">
                 <ClipboardCheck className="h-5 w-5 text-primary" />
                 <div className="flex-1"><p className="text-sm font-semibold">Validar existencias</p><p className="text-xs text-muted-foreground">Opcional: cuenta lo que hay en físico y concilia.</p></div>
                 <button role="switch" aria-checked={s.validate} aria-label="Validar existencias"
-                  onClick={() => setS((x) => ({ ...x, validate: !x.validate, lines: x.validate ? autoLines(x.lines, x.startInventory) : x.lines }))}
+                  onClick={() => setS((x) => ({ ...x, validate: !x.validate, lines: x.validate ? autoLines(x.lines, x.startInventory, products) : x.lines }))}
                   className={`relative h-7 w-12 rounded-full transition ${s.validate ? "bg-primary" : "bg-muted"}`}>
                   <span className={`absolute top-1 h-5 w-5 rounded-full bg-background shadow transition ${s.validate ? "left-6" : "left-1"}`} />
                 </button>
@@ -179,10 +182,10 @@ function VisitApp() {
                   <div className="flex items-center gap-2 text-sm font-medium">{ok ? <Check className="h-4 w-4 text-success" /> : <AlertTriangle className="h-4 w-4 text-destructive" />}{ok ? "Existencias conciliadas" : "Hay diferencias en el conteo físico"}</div>
                 </Card>
               )}
-              {PRODUCTS.map((p) => {
-                const l = s.lines[p.id]; const avail = s.startInventory[p.id];
+              {products.map((p) => {
+                const l = safeLine(s.lines[p.id]); const avail = s.startInventory[p.id] ?? 0;
                 const diff = rec.find((r) => r.product.id === p.id)?.diff ?? 0;
-                const set = (k: CountKey) => (v: number) => setS((x) => ({ ...x, lines: { ...x.lines, [p.id]: setCount(x.lines[p.id], k, v, avail) } }));
+                const set = (k: CountKey) => (v: number) => setS((x) => ({ ...x, lines: { ...x.lines, [p.id]: setCount(safeLine(x.lines[p.id]), k, v, avail) } }));
                 return (
                   <Card key={p.id}>
                     <div className="mb-3 flex items-baseline justify-between">
@@ -212,8 +215,8 @@ function VisitApp() {
                 <Stat label="Mermas (sin cargo)" value={st.lost} /><Stat label="Restantes" value={st.remaining} />
               </div>
               <Card>
-                {PRODUCTS.filter((p) => s.lines[p.id].sold > 0).map((p) => (
-                  <Row key={p.id} label={`${p.name} · ${s.lines[p.id].sold} × ${money(p.price)}`} value={money(s.lines[p.id].sold * p.price)} />
+                {products.filter((p) => safeLine(s.lines[p.id]).sold > 0).map((p) => (
+                  <Row key={p.id} label={`${p.name} · ${safeLine(s.lines[p.id]).sold} × ${money(p.price)}`} value={money(safeLine(s.lines[p.id]).sold * p.price)} />
                 ))}
                 <div className="mt-2 border-t pt-3"><Row label="Total a liquidar" value={money(st.total)} big /></div>
               </Card>
@@ -266,11 +269,11 @@ function VisitApp() {
           {s.view === "cons" && (
             <>
               <Card><p className="font-display text-lg font-bold">Nueva mercancía</p><p className="text-sm text-muted-foreground">La consignación no genera cargos. Inventario actual: {sum(s.inventory)} u.</p></Card>
-              <button onClick={() => setS((x) => ({ ...x, newCons: { ...DEMO_NEW } }))} className="w-full rounded-xl border border-dashed border-primary/50 py-2 text-sm font-medium text-primary">Cargar datos de prueba</button>
-              {PRODUCTS.map((p) => (
+              <button onClick={() => setS((x) => ({ ...x, newCons: { ...EMPTY, ...Object.fromEntries(Object.entries(DEMO_NEW).filter(([k]) => products.some((p) => p.id === k))) } }))} className="w-full rounded-xl border border-dashed border-primary/50 py-2 text-sm font-medium text-primary">Cargar datos de prueba</button>
+              {products.map((p) => (
                 <Card key={p.id} className="flex items-center justify-between gap-3">
-                  <div><p className="font-semibold">{p.name}</p><p className="text-xs text-muted-foreground">Tiene {s.inventory[p.id]}</p></div>
-                  <div className="w-36"><Stepper value={s.newCons[p.id]} onChange={(v) => setS((x) => ({ ...x, newCons: { ...x.newCons, [p.id]: v } }))} max={999} /></div>
+                  <div><p className="font-semibold">{p.name}</p><p className="text-xs text-muted-foreground">Tiene {s.inventory[p.id] ?? 0}</p></div>
+                  <div className="w-36"><Stepper value={s.newCons[p.id] ?? 0} onChange={(v) => setS((x) => ({ ...x, newCons: { ...x.newCons, [p.id]: v } }))} max={999} /></div>
                 </Card>
               ))}
               <Card className="bg-accent"><Row label={`Nuevas: ${sum(s.newCons)} u.`} value={`Final: ${sum(s.inventory) + sum(s.newCons)} u.`} big /></Card>
@@ -283,7 +286,7 @@ function VisitApp() {
             {s.view === "liq" && s.step === 0 && <Primary disabled={!ok} onClick={() => up({ step: 1 })}>{ok ? "Ver resumen" : "Corrige las diferencias"}</Primary>}
             {s.view === "liq" && s.step === 1 && <Primary onClick={() => {
               if (!confirm(`¿Confirmar liquidación por ${money(st.total)}? Se cargará a la cuenta del cliente.`)) return;
-              const inv = Object.fromEntries(PRODUCTS.map((p) => [p.id, s.lines[p.id].physical])) as Inv;
+              const inv = Object.fromEntries(products.map((p) => [p.id, safeLine(s.lines[p.id]).physical])) as Inv;
               up({ balance: s.balance + st.total, charged: st.total, inventory: inv, payment: s.balance + st.total, step: 2 });
             }}>Confirmar liquidación · {money(st.total)}</Primary>}
             {s.view === "liq" && s.step === 2 && <Primary onClick={() => {
@@ -293,7 +296,7 @@ function VisitApp() {
             {s.view === "liq" && s.step === 3 && <Primary disabled={saving} onClick={() => void home("Liquidación registrada")}>{saving ? "Guardando…" : "Volver al inicio"}</Primary>}
             {s.view === "cons" && <Primary disabled={sum(s.newCons) === 0 || saving} onClick={() => {
               if (!confirm(`¿Consignar ${sum(s.newCons)} unidades?`)) return;
-              const inv = Object.fromEntries(PRODUCTS.map((p) => [p.id, s.inventory[p.id] + s.newCons[p.id]])) as Inv;
+              const inv = Object.fromEntries(products.map((p) => [p.id, (s.inventory[p.id] ?? 0) + (s.newCons[p.id] ?? 0)])) as Inv;
               const n = sum(s.newCons);
               void home(`${n} unidades consignadas`, { ...s, inventory: inv, consigned: n, newCons: { ...EMPTY } });
             }}><PackagePlus className="h-4 w-4" />{saving ? "Guardando…" : "Consignar"}</Primary>}
