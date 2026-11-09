@@ -14,7 +14,7 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: {
   },
   from: () => ({ select: () => ({ eq: (_key: string, owner: string) => {
     mocked.owners.push(owner);
-    return { order: () => ({ range: async () => ({ error: null, data: [{ id: owner, name: `Cliente ${owner}`, phone: "", city: "", balance: 0, inventory: {} }] }) }) };
+    return { order: () => ({ then: (ok: (v: unknown) => unknown) => Promise.resolve({ error: null, data: [] }).then(ok), range: async () => ({ error: null, data: [{ id: owner, name: `Cliente ${owner}`, phone: "", city: "", balance: 0, inventory: {} }] }) }) };
   } }) }),
 } }));
 function Directory() {
