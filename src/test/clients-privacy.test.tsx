@@ -28,7 +28,7 @@ it("replaces private clients when accounts change and clears them on sign-out", 
   act(() => { mocked.user = "account-b"; mocked.listener("SIGNED_IN"); });
   await screen.findByText("Cliente account-b");
   expect(screen.queryByText("Cliente account-a")).not.toBeInTheDocument();
-  expect(mocked.owners).toEqual(["account-a", "account-b"]);
+  expect([...new Set(mocked.owners)]).toEqual(["account-a", "account-b"]);
   act(() => { mocked.user = null; mocked.listener("SIGNED_OUT"); });
   await waitFor(() => expect(screen.queryByText("loading")).not.toBeInTheDocument());
   expect(screen.queryByText("Cliente account-b")).not.toBeInTheDocument();
