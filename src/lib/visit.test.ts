@@ -130,15 +130,15 @@ import { indicators } from "./visit";
 describe("indicators", () => {
   const now = new Date(2026, 10, 11, 12); // miércoles 11 nov
   const v = [
-    { clientId: "a", kind: "liq" as const, units: 5, amount: 30000, at: new Date(2026, 10, 9, 9).toISOString() }, // lunes
+    { clientId: "a", kind: "liq" as const, units: 5, amount: 30000, items: { usb: 3, hands: 2 }, at: new Date(2026, 10, 9, 9).toISOString() }, // lunes
     { clientId: "a", kind: "cons" as const, units: 20, amount: 0, at: new Date(2026, 10, 10).toISOString() },
-    { clientId: "b", kind: "liq" as const, units: 2, amount: 8000, at: new Date(2026, 10, 3).toISOString() }, // semana pasada
+    { clientId: "b", kind: "liq" as const, units: 2, amount: 8000, items: { hands: 2 }, at: new Date(2026, 10, 3).toISOString() }, // semana pasada
     { clientId: "b", kind: "cons" as const, units: 7, amount: 0, at: new Date(2026, 9, 30).toISOString() }, // octubre
   ];
   it("cuenta la semana desde el lunes", () => {
-    expect(indicators(v, now).week).toEqual({ visits: 2, liquidations: 1, liquidated: 30000, consignments: 1, consignedUnits: 20 });
+    expect(indicators(v, now).week).toEqual({ top: { id: "usb", units: 3 }, visits: 2, liquidations: 1, liquidated: 30000, consignments: 1, consignedUnits: 20 });
   });
   it("cuenta el mes calendario", () => {
-    expect(indicators(v, now).month).toEqual({ visits: 3, liquidations: 2, liquidated: 38000, consignments: 1, consignedUnits: 20 });
+    expect(indicators(v, now).month).toEqual({ top: { id: "hands", units: 4 }, visits: 3, liquidations: 2, liquidated: 38000, consignments: 1, consignedUnits: 20 });
   });
 });

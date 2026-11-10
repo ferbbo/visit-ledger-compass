@@ -77,6 +77,7 @@ export type Database = {
           client_id: string
           created_at: string
           id: string
+          items: Json
           kind: string
           owner_id: string
           units: number
@@ -86,6 +87,7 @@ export type Database = {
           client_id: string
           created_at?: string
           id?: string
+          items?: Json
           kind: string
           owner_id?: string
           units?: number
@@ -95,6 +97,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           id?: string
+          items?: Json
           kind?: string
           owner_id?: string
           units?: number

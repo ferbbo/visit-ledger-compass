@@ -13,7 +13,9 @@ type Directory = {
   saveProduct: (fields: { name: string; price: number }, id?: string) => Promise<void>;
   removeProduct: (id: string) => Promise<void>;
 };
-const Context = createContext<Directory | null>(null);
+// Se conserva entre recargas en caliente para no perder el proveedor del root.
+const g = globalThis as { __clientsCtx?: ReturnType<typeof createContext<Directory | null>> };
+const Context = (g.__clientsCtx ??= createContext<Directory | null>(null));
 export function ClientsProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<Client[]>(CLIENTS);
   const [userId, setUserId] = useState<string | null>(null);
@@ -47,9 +49,9 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
     setClients(rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone, city: r.city, previousBalance: Number(r.balance),
       inventory: Object.fromEntries(list.map((p) => [p.id, Math.max(0, Number((r.inventory as Record<string, unknown>)?.[p.id]) || 0)])) as Inv })));
     const since = new Date(); since.setDate(since.getDate() - 40);
-    const log = await supabase.from("visits").select("client_id,kind,units,amount,created_at").eq("owner_id", user.id).gte("created_at", since.toISOString()).order("created_at").limit(5000);
+    const log = await supabase.from("visits").select("client_id,kind,units,amount,created_at,items").eq("owner_id", user.id).gte("created_at", since.toISOString()).order("created_at").limit(5000);
     if (request !== generation.current) return;
-    if (log.data) setVisits(log.data.map((v) => ({ clientId: v.client_id, kind: v.kind === "cons" ? "cons" : "liq", units: v.units, amount: Number(v.amount), at: v.created_at })));
+    if (log.data) setVisits(log.data.map((v) => ({ clientId: v.client_id, kind: v.kind === "cons" ? "cons" : "liq", units: v.units, amount: Number(v.amount), at: v.created_at, items: (v.items && typeof v.items === "object" && !Array.isArray(v.items) ? v.items : {}) as Inv })));
     setLoading(false);
   }
   useEffect(() => {
@@ -80,7 +82,7 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
   async function saveVisit(id: string, inventory: Inv, balance: number, record?: Omit<VisitRecord, "clientId" | "at">) {
     if (!userId) { if (record) setVisits((v) => [...v, { ...record, clientId: id, at: new Date().toISOString() }]); return; }
     if (record) {
-      const r = await supabase.from("visits").insert({ client_id: id, kind: record.kind, units: Math.max(0, Math.round(record.units)), amount: Math.max(0, Math.round(record.amount)) });
+      const r = await supabase.from("visits").insert({ client_id: id, kind: record.kind, units: Math.max(0, Math.round(record.units)), amount: Math.max(0, Math.round(record.amount)), items: record.items ?? {} });
       if (r.error) throw new Error("No se pudo registrar la visita. Intenta de nuevo.");
     }
     const { error } = await supabase.from("clients").update({ inventory, balance }).eq("id", id).select().single();
