@@ -7,6 +7,7 @@ import { AccountControl } from "@/components/account-control";
 import {
   clientById, searchClients, openClient, saveClient, DEMO_LINES, DEMO_NEW, PRODUCTS, METHODS, LIQ_STEPS, defaultLines, emptyInv, safeLine, initialState, loadState, money, reconcile, setCount, settlement, sum,
   type CountKey, type Inv, type State, type Lines,
+  indicators,
 } from "@/lib/visit";
 
 export const Route = createFileRoute("/")({
