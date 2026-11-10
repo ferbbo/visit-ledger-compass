@@ -13,7 +13,9 @@ type Directory = {
   saveProduct: (fields: { name: string; price: number }, id?: string) => Promise<void>;
   removeProduct: (id: string) => Promise<void>;
 };
-const Context = createContext<Directory | null>(null);
+// Se conserva entre recargas en caliente para no perder el proveedor del root.
+const g = globalThis as { __clientsCtx?: ReturnType<typeof createContext<Directory | null>> };
+const Context = (g.__clientsCtx ??= createContext<Directory | null>(null));
 export function ClientsProvider({ children }: { children: ReactNode }) {
   const [clients, setClients] = useState<Client[]>(CLIENTS);
   const [userId, setUserId] = useState<string | null>(null);
