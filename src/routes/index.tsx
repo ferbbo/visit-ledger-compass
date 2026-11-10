@@ -63,7 +63,7 @@ function VisitApp() {
   const pending = Math.max(0, s.balance - s.payment);
   const [q, setQ] = useState("");
   const client = clientById(s.clientId, clients);
-  const home = async (msg = "", state = s, record?: { kind: "liq" | "cons"; units: number; amount: number }) => {
+  const home = async (msg = "", state = s, record?: { kind: "liq" | "cons"; units: number; amount: number; items?: Inv }) => {
     setSaving(true); setFailure("");
     try {
       if (msg && state.clientId) await saveVisit(state.clientId, state.inventory, state.balance, record);
@@ -118,7 +118,7 @@ function VisitApp() {
                 <Stat label="Clientes" value={clients.length} />
                 <Stat label="Por cobrar" value={money(clients.reduce((a, c) => a + (userId ? c.previousBalance : s.book[c.id]?.balance ?? 0), 0))} />
               </div>
-              <Indicators data={indicators(visits)} />
+              <Indicators data={indicators(visits)} products={products} />
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                 <input autoFocus aria-label="Buscar cliente" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, teléfono o ciudad"
@@ -295,7 +295,7 @@ function VisitApp() {
               if (s.payment > 0 && !confirm(`¿Registrar pago de ${money(s.payment)} en ${s.method}?`)) return;
               up({ balance: s.balance - s.payment, step: 3 });
             }}>{s.payment > 0 ? "Registrar pago" : "Continuar sin pago"}</Primary>}
-            {s.view === "liq" && s.step === 3 && <Primary disabled={saving} onClick={() => void home("Liquidación registrada", s, { kind: "liq", units: st.sold, amount: s.charged })}>{saving ? "Guardando…" : "Volver al inicio"}</Primary>}
+            {s.view === "liq" && s.step === 3 && <Primary disabled={saving} onClick={() => void home("Liquidación registrada", s, { kind: "liq", units: st.sold, amount: s.charged, items: Object.fromEntries(products.map((p) => [p.id, safeLine(s.lines[p.id]).sold])) as Inv })}>{saving ? "Guardando…" : "Volver al inicio"}</Primary>}
             {s.view === "cons" && <Primary disabled={sum(s.newCons) === 0 || saving} onClick={() => {
               if (!confirm(`¿Consignar ${sum(s.newCons)} unidades?`)) return;
               const inv = Object.fromEntries(products.map((p) => [p.id, (s.inventory[p.id] ?? 0) + (s.newCons[p.id] ?? 0)])) as Inv;
@@ -309,7 +309,7 @@ function VisitApp() {
   );
 }
 
-function Indicators({ data }: { data: ReturnType<typeof indicators> }) {
+function Indicators({ data, products }: { data: ReturnType<typeof indicators>; products: { id: string; name: string }[] }) {
   const [period, setPeriod] = useState<"week" | "month">("week");
   const d = data[period];
   return (
@@ -327,6 +327,10 @@ function Indicators({ data }: { data: ReturnType<typeof indicators> }) {
         <div><p className="font-display text-2xl font-bold">{d.visits}</p><p className="text-xs text-muted-foreground">Visitas</p></div>
         <div><p className="font-display text-2xl font-bold">{d.liquidations}</p><p className="text-xs text-muted-foreground">Liquidaciones</p><p className="text-xs font-semibold">{money(d.liquidated)}</p></div>
         <div><p className="font-display text-2xl font-bold">{d.consignments}</p><p className="text-xs text-muted-foreground">Consignaciones</p><p className="text-xs font-semibold">{d.consignedUnits} u.</p></div>
+      </div>
+      <div className="mt-3 flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2 text-sm">
+        <span className="text-muted-foreground">Más vendido</span>
+        <span className="font-semibold">{d.top ? `${products.find((p) => p.id === d.top!.id)?.name ?? "Producto eliminado"} · ${d.top.units} u.` : "Sin ventas aún"}</span>
       </div>
     </section>
   );
