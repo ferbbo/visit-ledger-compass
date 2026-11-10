@@ -1,0 +1,1 @@
+ALTER TABLE public.visits ADD COLUMN items jsonb NOT NULL DEFAULT '{}'::jsonb;
