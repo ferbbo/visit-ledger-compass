@@ -7,6 +7,7 @@ import { AccountControl } from "@/components/account-control";
 import {
   clientById, searchClients, openClient, saveClient, DEMO_LINES, DEMO_NEW, PRODUCTS, METHODS, LIQ_STEPS, defaultLines, emptyInv, safeLine, initialState, loadState, money, reconcile, setCount, settlement, sum,
   type CountKey, type Inv, type State, type Lines,
+  indicators,
 } from "@/lib/visit";
 
 export const Route = createFileRoute("/")({
@@ -28,7 +29,7 @@ const autoLines = (l: Lines, inv: Inv, products = PRODUCTS): Lines =>
   Object.fromEntries(products.map((p) => { const x = safeLine(l[p.id]); return [p.id, { ...x, manual: false, physical: Math.max(0, (inv[p.id] ?? 0) - x.sold - x.returned - x.lost) }]; })) as Lines;
 
 function VisitApp() {
-  const { clients, userId, loading, error, saveVisit, products } = useClients();
+  const { clients, userId, loading, error, saveVisit, products, visits } = useClients();
   const EMPTY = emptyInv(products);
   const [s, setS] = useState<State>(() => initialState());
   const [ready, setReady] = useState(false);
@@ -62,10 +63,10 @@ function VisitApp() {
   const pending = Math.max(0, s.balance - s.payment);
   const [q, setQ] = useState("");
   const client = clientById(s.clientId, clients);
-  const home = async (msg = "", state = s) => {
+  const home = async (msg = "", state = s, record?: { kind: "liq" | "cons"; units: number; amount: number }) => {
     setSaving(true); setFailure("");
     try {
-      if (msg && state.clientId) await saveVisit(state.clientId, state.inventory, state.balance);
+      if (msg && state.clientId) await saveVisit(state.clientId, state.inventory, state.balance, record);
       setNotice(msg); setS(saveClient({ ...state, view: "home", step: 0 })); window.scrollTo(0, 0);
     } catch (e) { setFailure(e instanceof Error ? e.message : "No se pudo guardar la visita."); }
     finally { setSaving(false); }
@@ -117,6 +118,7 @@ function VisitApp() {
                 <Stat label="Clientes" value={clients.length} />
                 <Stat label="Por cobrar" value={money(clients.reduce((a, c) => a + (userId ? c.previousBalance : s.book[c.id]?.balance ?? 0), 0))} />
               </div>
+              <Indicators data={indicators(visits)} />
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                 <input autoFocus aria-label="Buscar cliente" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, teléfono o ciudad"
@@ -293,17 +295,40 @@ function VisitApp() {
               if (s.payment > 0 && !confirm(`¿Registrar pago de ${money(s.payment)} en ${s.method}?`)) return;
               up({ balance: s.balance - s.payment, step: 3 });
             }}>{s.payment > 0 ? "Registrar pago" : "Continuar sin pago"}</Primary>}
-            {s.view === "liq" && s.step === 3 && <Primary disabled={saving} onClick={() => void home("Liquidación registrada")}>{saving ? "Guardando…" : "Volver al inicio"}</Primary>}
+            {s.view === "liq" && s.step === 3 && <Primary disabled={saving} onClick={() => void home("Liquidación registrada", s, { kind: "liq", units: st.sold, amount: s.charged })}>{saving ? "Guardando…" : "Volver al inicio"}</Primary>}
             {s.view === "cons" && <Primary disabled={sum(s.newCons) === 0 || saving} onClick={() => {
               if (!confirm(`¿Consignar ${sum(s.newCons)} unidades?`)) return;
               const inv = Object.fromEntries(products.map((p) => [p.id, (s.inventory[p.id] ?? 0) + (s.newCons[p.id] ?? 0)])) as Inv;
               const n = sum(s.newCons);
-              void home(`${n} unidades consignadas`, { ...s, inventory: inv, consigned: n, newCons: { ...EMPTY } });
+              void home(`${n} unidades consignadas`, { ...s, inventory: inv, consigned: n, newCons: { ...EMPTY } }, { kind: "cons", units: n, amount: 0 });
             }}><PackagePlus className="h-4 w-4" />{saving ? "Guardando…" : "Consignar"}</Primary>}
           </footer>
         )}
       </div>
     </div>
+  );
+}
+
+function Indicators({ data }: { data: ReturnType<typeof indicators> }) {
+  const [period, setPeriod] = useState<"week" | "month">("week");
+  const d = data[period];
+  return (
+    <section aria-label="Indicadores" className="rounded-2xl border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="font-display font-bold">Indicadores</h2>
+        <div className="flex rounded-full bg-muted p-1 text-xs">
+          {(["week", "month"] as const).map((k) => (
+            <button key={k} onClick={() => setPeriod(k)} aria-pressed={period === k}
+              className={`rounded-full px-3 py-1 font-medium ${period === k ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{k === "week" ? "Semana" : "Mes"}</button>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div><p className="font-display text-2xl font-bold">{d.visits}</p><p className="text-xs text-muted-foreground">Visitas</p></div>
+        <div><p className="font-display text-2xl font-bold">{d.liquidations}</p><p className="text-xs text-muted-foreground">Liquidaciones</p><p className="text-xs font-semibold">{money(d.liquidated)}</p></div>
+        <div><p className="font-display text-2xl font-bold">{d.consignments}</p><p className="text-xs text-muted-foreground">Consignaciones</p><p className="text-xs font-semibold">{d.consignedUnits} u.</p></div>
+      </div>
+    </section>
   );
 }
 

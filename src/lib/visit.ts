@@ -192,3 +192,17 @@ export function settlement(lines: Lines | undefined, products = PRODUCTS) {
 }
 
 export const money = (n: number) => "$" + Math.round(num(n)).toLocaleString("es-CO");
+
+// Indicadores: semana desde el lunes y mes calendario, en hora local.
+export type VisitRecord = { clientId: string; kind: "liq" | "cons"; units: number; amount: number; at: string };
+export function indicators(visits: VisitRecord[], now = new Date()) {
+  const week = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+  const month = new Date(now.getFullYear(), now.getMonth(), 1);
+  const calc = (from: Date) => {
+    const v = visits.filter((x) => { const t = new Date(x.at); return t >= from && t <= now; });
+    const liq = v.filter((x) => x.kind === "liq"); const cons = v.filter((x) => x.kind === "cons");
+    return { visits: v.length, liquidations: liq.length, liquidated: liq.reduce((a, x) => a + x.amount, 0),
+      consignments: cons.length, consignedUnits: cons.reduce((a, x) => a + x.units, 0) };
+  };
+  return { week: calc(week), month: calc(month) };
+}
