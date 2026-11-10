@@ -4,6 +4,7 @@ import { Search, MapPin, Minus, Plus, Check, AlertTriangle, Phone, ChevronLeft, 
 import { useClients } from "@/components/clients-provider";
 import { Button } from "@/components/ui/button";
 import { AccountControl } from "@/components/account-control";
+import { AuthScreen } from "@/components/auth-screen";
 import {
   clientById, searchClients, openClient, saveClient, DEMO_LINES, DEMO_NEW, PRODUCTS, METHODS, LIQ_STEPS, defaultLines, emptyInv, safeLine, initialState, loadState, money, reconcile, setCount, settlement, sum,
   type CountKey, type Inv, type State, type Lines,
@@ -89,6 +90,9 @@ function VisitApp() {
   const back = () => (s.view === "home" ? toDashboard() : s.view === "liq" && s.step === 1 ? up({ step: 0 }) : home());
 
   if (loading || !ready || restored.current !== owner) return <div className="mx-auto min-h-screen max-w-md bg-background p-4"><p role="status" className="text-sm text-muted-foreground">Cargando clientes…</p></div>;
+
+  // Sin sesión no hay tablero: la app abre directo en el acceso.
+  if (!userId) return <LoginGate />;
 
   return (
     <div className="min-h-screen bg-muted/40">
@@ -304,6 +308,17 @@ function VisitApp() {
             }}><PackagePlus className="h-4 w-4" />{saving ? "Guardando…" : "Consignar"}</Primary>}
           </footer>
         )}
+      </div>
+    </div>
+  );
+}
+
+function LoginGate() {
+  return (
+    <div className="min-h-screen bg-muted/40">
+      <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background shadow-xl">
+        <header className="border-b bg-background/95 px-4 pb-3 pt-4"><h1 className="font-display text-xl font-bold">Visita comercial</h1></header>
+        <AuthScreen redirect="/" />
       </div>
     </div>
   );
