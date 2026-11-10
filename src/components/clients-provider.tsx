@@ -1,13 +1,14 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { CLIENTS, PRODUCTS, type Client, type Inv, type Product } from "@/lib/visit";
+import { CLIENTS, PRODUCTS, type Client, type Inv, type Product, type VisitRecord } from "@/lib/visit";
 
 type Directory = {
   clients: Client[]; userId: string | null; loading: boolean; error: string;
   refresh: () => Promise<void>;
   save: (fields: { name: string; phone: string; city: string }, id?: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
-  saveVisit: (id: string, inventory: Inv, balance: number) => Promise<void>;
+  saveVisit: (id: string, inventory: Inv, balance: number, record?: Omit<VisitRecord, "clientId" | "at">) => Promise<void>;
+  visits: VisitRecord[];
   products: Product[];
   saveProduct: (fields: { name: string; price: number }, id?: string) => Promise<void>;
   removeProduct: (id: string) => Promise<void>;
@@ -19,6 +20,7 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [custom, setCustom] = useState(false);
   const generation = useRef(0);
   async function refresh() {
@@ -27,7 +29,7 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (request !== generation.current) return;
     setUserId(user?.id ?? null);
-    if (!user) { setClients(CLIENTS); setProducts(PRODUCTS); setCustom(false); setLoading(false); return; }
+    if (!user) { setVisits([]); setClients(CLIENTS); setProducts(PRODUCTS); setCustom(false); setLoading(false); return; }
     if (authError) throw authError;
     const catalog = await supabase.from("products").select("id,name,price").eq("owner_id", user.id).order("created_at");
     if (request !== generation.current) return;
@@ -44,6 +46,10 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
     }
     setClients(rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone, city: r.city, previousBalance: Number(r.balance),
       inventory: Object.fromEntries(list.map((p) => [p.id, Math.max(0, Number((r.inventory as Record<string, unknown>)?.[p.id]) || 0)])) as Inv })));
+    const since = new Date(); since.setDate(since.getDate() - 40);
+    const log = await supabase.from("visits").select("client_id,kind,units,amount,created_at").eq("owner_id", user.id).gte("created_at", since.toISOString()).order("created_at").limit(5000);
+    if (request !== generation.current) return;
+    if (log.data) setVisits(log.data.map((v) => ({ clientId: v.client_id, kind: v.kind === "cons" ? "cons" : "liq", units: v.units, amount: Number(v.amount), at: v.created_at })));
     setLoading(false);
   }
   useEffect(() => {
@@ -71,8 +77,12 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error("No se pudo eliminar el cliente. Intenta de nuevo.");
     await refresh();
   }
-  async function saveVisit(id: string, inventory: Inv, balance: number) {
-    if (!userId) return;
+  async function saveVisit(id: string, inventory: Inv, balance: number, record?: Omit<VisitRecord, "clientId" | "at">) {
+    if (!userId) { if (record) setVisits((v) => [...v, { ...record, clientId: id, at: new Date().toISOString() }]); return; }
+    if (record) {
+      const r = await supabase.from("visits").insert({ client_id: id, kind: record.kind, units: Math.max(0, Math.round(record.units)), amount: Math.max(0, Math.round(record.amount)) });
+      if (r.error) throw new Error("No se pudo registrar la visita. Intenta de nuevo.");
+    }
     const { error } = await supabase.from("clients").update({ inventory, balance }).eq("id", id).select().single();
     if (error) throw new Error("No se pudo guardar la visita. Intenta de nuevo.");
     await refresh();
@@ -104,7 +114,7 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error("No se pudo eliminar el producto. Intenta de nuevo.");
     await refresh();
   }
-  return <Context.Provider value={{ clients, userId, loading, error, refresh, save, remove, saveVisit, products, saveProduct, removeProduct }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ clients, userId, loading, error, refresh, save, remove, saveVisit, visits, products, saveProduct, removeProduct }}>{children}</Context.Provider>;
 }
 export function useClients() {
   const value = useContext(Context);
